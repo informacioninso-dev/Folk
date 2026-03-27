@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { pagosFullPassApi, pagosCategoriaApi } from "@/features/eventos/api";
 import type { PagoFullPass, PagoCategoria } from "@/features/eventos/types";
@@ -25,7 +25,7 @@ export default function PagosPage() {
   const [rechazarModal, setRechazarModal] = useState<{ tipo: TabType; id: number } | null>(null);
   const [notaRechazo, setNotaRechazo] = useState("");
 
-  async function cargar() {
+  const cargar = useCallback(async () => {
     setLoading(true);
     try {
       const [fp, cat] = await Promise.all([
@@ -37,9 +37,9 @@ export default function PagosPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [eventoId, filtroEstado]);
 
-  useEffect(() => { cargar(); }, [eventoId, filtroEstado]);
+  useEffect(() => { cargar(); }, [cargar]);
 
   async function aprobar(tipo: TabType, id: number) {
     if (tipo === "full_pass") {

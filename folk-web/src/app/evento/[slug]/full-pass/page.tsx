@@ -10,6 +10,10 @@ import {
   type EventoPortal,
   type PagoFullPassEstado,
 } from "@/features/portal/api";
+import PrivacyConsent, {
+  createPrivacyConsentState,
+  validatePrivacyConsent,
+} from "@/features/portal/components/PrivacyConsent";
 
 const ESTADO_LABELS: Record<string, { label: string; bg: string; text: string; desc: string }> = {
   pendiente: {
@@ -49,6 +53,7 @@ export default function FullPassPage() {
   const [enviando, setEnviando] = useState(false);
   const [exito, setExito] = useState(false);
   const [error, setError] = useState("");
+  const [privacy, setPrivacy] = useState(createPrivacyConsentState);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -56,12 +61,11 @@ export default function FullPassPage() {
   }, [slug]);
 
   async function buscarEstado() {
-    if (cedula.length < 4) return;
+    if (cedula.length < 6) return;
     setBuscando(true);
     try {
       const data = await getFullPassEstado(slug, cedula);
       setEstado(data);
-      if (data) setForm((f) => ({ ...f, nombre_completo: data.nombre_completo }));
     } finally {
       setBuscando(false);
     }
@@ -73,6 +77,11 @@ export default function FullPassPage() {
       setError("Debes subir el comprobante o ingresar el número de transacción.");
       return;
     }
+    const privacyError = validatePrivacyConsent(privacy);
+    if (privacyError) {
+      setError(privacyError);
+      return;
+    }
     setError("");
     setEnviando(true);
     try {
@@ -82,10 +91,18 @@ export default function FullPassPage() {
       fd.append("correo_electronico", form.correo_electronico);
       fd.append("telefono", form.telefono);
       fd.append("numero_comprobante", form.numero_comprobante);
+      fd.append("acepta_politica_privacidad", String(privacy.acepta_politica_privacidad));
+      fd.append("es_menor_edad", String(privacy.es_menor_edad));
+      fd.append(
+        "acepta_como_representante_legal",
+        String(privacy.acepta_como_representante_legal)
+      );
+      fd.append("nombre_representante_legal", privacy.nombre_representante_legal);
+      fd.append("cedula_representante_legal", privacy.cedula_representante_legal);
       if (file) fd.append("comprobante_imagen", file);
       await submitFullPass(slug, fd);
       setExito(true);
-      setEstado({ estado: "pendiente", nombre_completo: form.nombre_completo, cedula });
+      setEstado({ estado: "pendiente" });
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { cedula?: string[] } } };
       const msg = axiosErr?.response?.data?.cedula?.[0] || "Error al enviar. Intenta nuevamente.";
@@ -154,7 +171,7 @@ export default function FullPassPage() {
             />
             <button
               onClick={buscarEstado}
-              disabled={buscando || cedula.length < 4}
+              disabled={buscando || cedula.length < 6}
               className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-5 py-2.5 rounded-xl text-sm font-semibold transition"
             >
               {buscando ? "Buscando…" : "Consultar"}
@@ -184,7 +201,7 @@ export default function FullPassPage() {
         )}
 
         {/* Formulario */}
-        {puedeEnviar && cedula.length >= 4 && !exito && (
+        {puedeEnviar && cedula.length >= 6 && !exito && (
           <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-gray-100 p-6 space-y-5 shadow-sm">
             <h2 className="text-base font-bold text-gray-900">
               {estado?.estado === "rechazado" ? "Reenviar comprobante" : "Registrar pago"}
@@ -250,6 +267,17 @@ export default function FullPassPage() {
 
             {error && (
               <p className="text-red-600 text-sm bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>
+            )}
+
+            {evento && (
+              <PrivacyConsent
+                value={privacy}
+                onChange={setPrivacy}
+                notice={evento.aviso_privacidad_corto}
+                policyUrl={evento.politica_privacidad_url}
+                version={evento.version_politica_privacidad}
+                contactEmail={evento.contacto_privacidad}
+              />
             )}
 
             <button

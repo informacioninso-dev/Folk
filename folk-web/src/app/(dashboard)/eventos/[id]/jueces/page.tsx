@@ -54,7 +54,7 @@ function CategoriasEditor({
 
   const guardar = () => {
     mutation.mutate(
-      { juezId: juez.id, categorias: [...seleccionadas] },
+      { juezId: juez.id, categorias: Array.from(seleccionadas) },
       { onSuccess: onClose }
     );
   };
@@ -73,7 +73,7 @@ function CategoriasEditor({
 
       {Object.keys(grouped).length === 0 ? (
         <p className="text-sm text-gray-400">
-          Este evento aún no tiene categorías. Agrégalas en "Modalidades".
+          Este evento aún no tiene categorías. Agrégalas en &quot;Modalidades&quot;.
         </p>
       ) : (
         <div className="space-y-3">

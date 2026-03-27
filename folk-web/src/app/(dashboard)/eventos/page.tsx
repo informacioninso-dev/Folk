@@ -5,8 +5,7 @@ import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import Cookies from "js-cookie";
-import { decodeJwt } from "@/lib/jwt";
+import { useMe } from "@/features/auth/hooks";
 import { useEventos, useCrearEvento } from "@/features/eventos/hooks";
 import type { Evento } from "@/features/eventos/types";
 
@@ -26,17 +25,16 @@ const inputCls = "w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm t
 
 function NuevoEventoModal({ onClose }: { onClose: () => void }) {
   const crearMutation = useCrearEvento();
+  const { data: me } = useMe();
   const { register, handleSubmit, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: { activo: false },
   });
 
   const onSubmit = (values: FormValues) => {
-    const token = Cookies.get("folk_access");
-    const payload = token ? decodeJwt(token) : null;
-    if (!payload?.organizador_id) return;
+    if (!me?.organizador_id) return;
     crearMutation.mutate(
-      { ...values, organizador: payload.organizador_id },
+      values,
       { onSuccess: onClose }
     );
   };

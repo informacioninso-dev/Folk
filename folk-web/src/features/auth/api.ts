@@ -1,14 +1,13 @@
 import axios from "axios";
 import { apiClient } from "@/lib/api-client";
-import type { LoginCredentials, TokenPair, MeResponse } from "./types";
+import type { LoginCredentials, LoginResponse, MeResponse } from "./types";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL;
 
-export async function login(credentials: LoginCredentials): Promise<TokenPair> {
-  const { data } = await axios.post<TokenPair>(
-    `${BASE}/api/v1/auth/token/`,
-    credentials
-  );
+export async function login(credentials: LoginCredentials): Promise<LoginResponse> {
+  const { data } = await axios.post<LoginResponse>("/api/auth/login", credentials, {
+    withCredentials: true,
+  });
   return data;
 }
 

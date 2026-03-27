@@ -83,8 +83,8 @@ export default function HomePage() {
     return () => clearInterval(timer);
   }, [data]);
 
-  const eventos    = data?.eventos    ?? [];
-  const destacados = data?.destacados ?? [];
+  const eventos = useMemo(() => data?.eventos ?? [], [data?.eventos]);
+  const destacados = useMemo(() => data?.destacados ?? [], [data?.destacados]);
   const current    = destacados[sliderIdx];
 
   // Meses disponibles derivados de los eventos (únicos, ordenados)
@@ -133,7 +133,7 @@ export default function HomePage() {
           {/* Acciones */}
           <div className="flex items-center gap-2">
             <a
-              href="{`https://wa.me/${siteConfig.whatsapp_numero}?text=${encodeURIComponent(siteConfig.whatsapp_mensaje)}`}"
+              href={`https://wa.me/${siteConfig.whatsapp_numero}?text=${encodeURIComponent(siteConfig.whatsapp_mensaje)}`}
               target="_blank"
               rel="noopener noreferrer"
               className="hidden sm:inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold text-green-700 bg-green-50 hover:bg-green-100 transition"
@@ -355,7 +355,7 @@ export default function HomePage() {
 
           <div className="text-center">
             <a
-              href="{`https://wa.me/${siteConfig.whatsapp_numero}?text=${encodeURIComponent(siteConfig.whatsapp_mensaje)}`}"
+              href={`https://wa.me/${siteConfig.whatsapp_numero}?text=${encodeURIComponent(siteConfig.whatsapp_mensaje)}`}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2.5 bg-green-500 hover:bg-green-600 text-white font-bold px-8 py-3.5 rounded-xl transition shadow-lg shadow-green-200 text-sm"
@@ -388,7 +388,7 @@ export default function HomePage() {
             </p>
 
             <a
-              href="{`https://wa.me/${siteConfig.whatsapp_numero}?text=${encodeURIComponent(siteConfig.whatsapp_mensaje)}`}"
+              href={`https://wa.me/${siteConfig.whatsapp_numero}?text=${encodeURIComponent(siteConfig.whatsapp_mensaje)}`}
               target="_blank"
               rel="noopener noreferrer"
               className="relative inline-flex items-center gap-3 bg-white hover:bg-green-50 text-green-700 font-extrabold text-lg px-8 py-4 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-200 hover:scale-105"

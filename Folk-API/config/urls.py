@@ -3,7 +3,11 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
-from rest_framework_simplejwt.views import TokenRefreshView, TokenVerifyView
+from rest_framework_simplejwt.views import (
+    TokenBlacklistView,
+    TokenRefreshView,
+    TokenVerifyView,
+)
 
 from competition.views import (
     BloqueHorarioViewSet,
@@ -22,6 +26,7 @@ from competition.views import (
     FolkTokenObtainPairView,
     GenerarAgendaView,
     GrupoViewSet,
+    HealthCheckView,
     InscripcionModalidadView,
     InscripcionViewSet,
     ItemCronogramaViewSet,
@@ -75,9 +80,11 @@ urlpatterns = [
     # Auth
     path("api/v1/auth/token/", FolkTokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("api/v1/auth/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
+    path("api/v1/auth/token/blacklist/", TokenBlacklistView.as_view(), name="token_blacklist"),
     path("api/v1/auth/token/verify/", TokenVerifyView.as_view(), name="token_verify"),
     # Usuario actual
     path("api/v1/me/", MeView.as_view(), name="me"),
+    path("api/v1/health/", HealthCheckView.as_view(), name="health_check"),
     # Inscripción pública (sin auth)
     path("api/v1/registro/<slug:slug>/", RegistroPublicoView.as_view(), name="registro_publico"),
     # Búsqueda de usuarios para asignar jueces

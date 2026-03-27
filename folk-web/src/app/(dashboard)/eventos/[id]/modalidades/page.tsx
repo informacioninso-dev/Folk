@@ -222,7 +222,11 @@ export default function ModalidadesPage() {
   const toggleModalidad = (m: string) => {
     setSeleccion((prev) => {
       const next = new Set(prev);
-      next.has(m) ? next.delete(m) : next.add(m);
+      if (next.has(m)) {
+        next.delete(m);
+      } else {
+        next.add(m);
+      }
       return next;
     });
   };

@@ -3,9 +3,19 @@ export interface LoginCredentials {
   password: string;
 }
 
-export interface TokenPair {
-  access: string;
-  refresh: string;
+export interface LoginSession {
+  user_id: number;
+  username: string;
+  email: string;
+  is_staff: boolean;
+  organizador_id: number | null;
+  is_participante: boolean;
+  is_juez: boolean;
+  exp: number;
+}
+
+export interface LoginResponse {
+  session: LoginSession | null;
 }
 
 export interface Participacion {
@@ -24,5 +34,6 @@ export interface MeResponse {
   is_staff: boolean;
   organizador_id: number | null;
   is_participante: boolean;
+  is_juez?: boolean;
   participaciones: Participacion[];
 }

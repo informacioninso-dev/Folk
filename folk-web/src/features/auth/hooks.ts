@@ -1,10 +1,9 @@
 "use client";
 
+import axios from "axios";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { login, requestPasswordReset, confirmPasswordReset, getMe } from "./api";
-import { setAuthCookies, clearAuthCookies, getAccessToken } from "@/lib/api-client";
-import { decodeJwt } from "@/lib/jwt";
 import type { LoginCredentials } from "./types";
 
 export function useLogin() {
@@ -13,10 +12,10 @@ export function useLogin() {
   return useMutation({
     mutationFn: (credentials: LoginCredentials) => login(credentials),
     onSuccess: (data) => {
-      setAuthCookies(data.access, data.refresh);
-      const payload = decodeJwt(data.access);
-      if (payload?.is_staff) router.push("/superadmin");
-      else if (payload?.is_participante) router.push("/mi-inscripcion");
+      const session = data.session;
+      if (session?.is_staff) router.push("/superadmin");
+      else if (session?.is_participante) router.push("/mi-inscripcion");
+      else if (session?.is_juez && !session.organizador_id) router.push("/calificar");
       else router.push("/eventos");
     },
   });
@@ -36,18 +35,20 @@ export function useConfirmPasswordReset() {
 }
 
 export function useMe() {
-  const hasToken = !!getAccessToken();
   return useQuery({
     queryKey: ["me"],
     queryFn: getMe,
-    enabled: hasToken,
+    retry: false,
     staleTime: 60_000,
   });
 }
 
 export function useLogout() {
-  return () => {
-    clearAuthCookies();
-    window.location.href = "/login";
+  return async () => {
+    try {
+      await axios.post("/api/auth/logout", undefined, { withCredentials: true });
+    } finally {
+      window.location.href = "/login";
+    }
   };
 }

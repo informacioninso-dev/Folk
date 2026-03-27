@@ -240,7 +240,12 @@ export default function EventoPortalPage() {
             </div>
             <span className="font-extrabold">Folk</span>
           </Link>
-          <p className="text-xs text-gray-500">Plataforma de concursos de baile</p>
+          <div className="text-right space-y-1">
+            <p className="text-xs text-gray-500">Plataforma de concursos de baile</p>
+            <Link href={`/evento/${slug}/privacidad`} className="text-xs text-gray-400 hover:text-white transition">
+              Privacidad y tratamiento de datos
+            </Link>
+          </div>
         </div>
       </footer>
     </div>

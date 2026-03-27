@@ -15,11 +15,11 @@ export default function MiAgendaPage() {
   const { slug } = useParams<{ slug: string }>();
   const [cedula, setCedula] = useState("");
   const [buscando, setBuscando] = useState(false);
-  const [resultado, setResultado] = useState<{ cedula: string; items: AgendaItem[] } | null>(null);
+  const [resultado, setResultado] = useState<{ items: AgendaItem[] } | null>(null);
   const [error, setError] = useState("");
 
   async function buscar() {
-    if (cedula.length < 4) return;
+    if (cedula.length < 6) return;
     setBuscando(true);
     setError("");
     try {
@@ -75,7 +75,7 @@ export default function MiAgendaPage() {
             />
             <button
               onClick={buscar}
-              disabled={buscando || cedula.length < 4}
+              disabled={buscando || cedula.length < 6}
               className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-5 py-2.5 rounded-xl text-sm font-semibold transition"
             >
               {buscando ? "Buscando…" : "Ver agenda"}

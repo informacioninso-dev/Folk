@@ -459,6 +459,9 @@ class SiteConfig(models.Model):
                                         help_text="Número en formato internacional, ej: 593999999999")
     whatsapp_mensaje = models.CharField(max_length=300, blank=True,
                                         default="Hola! Quiero más información sobre Folk.")
+    politica_privacidad_version = models.CharField(max_length=40, blank=True, default="2026-03")
+    politica_privacidad_url = models.URLField(blank=True, default="")
+    aviso_privacidad_corto = models.TextField(blank=True, default="")
 
     class Meta:
         verbose_name = "Configuración del sitio"
@@ -473,6 +476,60 @@ class SiteConfig(models.Model):
 
 
 # ─── Ranking ──────────────────────────────────────────────────────────────────
+
+
+class ConsentimientoDatosPersonales(BaseModel):
+    class Flujo(models.TextChoices):
+        REGISTRO_GENERAL = "registro_general", "Registro general"
+        FULL_PASS = "full_pass", "Full Pass"
+        INSCRIPCION_CATEGORIA = "inscripcion_categoria", "Inscripción de categoría"
+
+    evento = models.ForeignKey(
+        Evento,
+        on_delete=models.CASCADE,
+        related_name="consentimientos_datos",
+    )
+    flujo = models.CharField(max_length=40, choices=Flujo.choices)
+    version_politica = models.CharField(max_length=40)
+    politica_privacidad_url = models.URLField(blank=True, default="")
+    aviso_privacidad = models.TextField(blank=True, default="")
+    titular_nombre = models.CharField(max_length=150)
+    titular_documento = models.CharField(max_length=32)
+    titular_correo = models.EmailField(blank=True, default="")
+    es_menor_edad = models.BooleanField(default=False)
+    aceptado_por_representante = models.BooleanField(default=False)
+    nombre_representante_legal = models.CharField(max_length=150, blank=True, default="")
+    cedula_representante_legal = models.CharField(max_length=32, blank=True, default="")
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.CharField(max_length=255, blank=True, default="")
+    participante_general = models.ForeignKey(
+        "ParticipanteGeneral",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="consentimientos_datos",
+    )
+    pago_full_pass = models.ForeignKey(
+        "PagoFullPass",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="consentimientos_datos",
+    )
+    inscripcion = models.ForeignKey(
+        "Inscripcion",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="consentimientos_datos",
+    )
+
+    class Meta:
+        ordering = ("-created_at",)
+
+    def __str__(self) -> str:
+        return f"{self.get_flujo_display()} - {self.titular_nombre} ({self.titular_documento})"
+
 
 class Ranking(BaseModel):
     class Estado(models.TextChoices):

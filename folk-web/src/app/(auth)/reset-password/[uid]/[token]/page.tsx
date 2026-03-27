@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import axios from "axios";
 import { useConfirmPasswordReset } from "@/features/auth/hooks";
 
 export default function ResetPasswordPage() {
@@ -11,6 +12,15 @@ export default function ResetPasswordPage() {
   const [confirm, setConfirm] = useState("");
   const [clientError, setClientError] = useState("");
   const mutation = useConfirmPasswordReset();
+  const serverError = axios.isAxiosError(mutation.error)
+    ? (() => {
+        const data = mutation.error.response?.data as
+          | { detail?: string; new_password?: string[] }
+          | undefined;
+        if (data?.new_password?.length) return data.new_password.join(" ");
+        return data?.detail ?? "El enlace ha expirado o es invalido. Solicita uno nuevo.";
+      })()
+    : "El enlace ha expirado o es invalido. Solicita uno nuevo.";
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,7 +85,7 @@ export default function ResetPasswordPage() {
 
             {(clientError || mutation.isError) && (
               <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 py-2 text-sm">
-                {clientError || "El enlace ha expirado o es inválido. Solicita uno nuevo."}
+                {clientError || serverError}
               </div>
             )}
 

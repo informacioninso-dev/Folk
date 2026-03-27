@@ -58,8 +58,10 @@ export function useEventoRanking(id: number) {
 export function useCrearEvento() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: Pick<Evento, "organizador" | "nombre" | "fecha" | "ubicacion" | "activo">) =>
-      eventosApi.create(data),
+    mutationFn: (
+      data: Pick<Evento, "nombre" | "fecha" | "ubicacion" | "activo"> &
+        Partial<Pick<Evento, "organizador">>
+    ) => eventosApi.create(data),
     onSuccess: () => qc.invalidateQueries({ queryKey: eventoKeys.all }),
   });
 }
@@ -337,7 +339,7 @@ export function useAgregarItemCronograma() {
 export function useEliminarItemCronograma() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, cronogramaId: _cid }: { id: number; cronogramaId: number }) =>
+    mutationFn: ({ id }: { id: number; cronogramaId: number }) =>
       cronogramaApi.deleteItem(id),
     onSuccess: (_, { cronogramaId }) =>
       qc.invalidateQueries({ queryKey: ["cronograma-items", cronogramaId] }),

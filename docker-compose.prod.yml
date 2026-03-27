@@ -1,0 +1,65 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: folk
+      POSTGRES_USER: folk
+      POSTGRES_PASSWORD: folk
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ./Folk-API
+      dockerfile: Dockerfile.prod
+    restart: unless-stopped
+    env_file:
+      - ./Folk-API/.env
+    command: >
+      sh -c "poetry run python manage.py migrate --noinput &&
+      poetry run python manage.py collectstatic --noinput &&
+      poetry run gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 120"
+    depends_on:
+      - db
+      - redis
+    ports:
+      - "8000:8000"
+    volumes:
+      - media_data:/app/media
+      - static_data:/app/staticfiles
+
+  worker:
+    build:
+      context: ./Folk-API
+      dockerfile: Dockerfile.prod
+    restart: unless-stopped
+    env_file:
+      - ./Folk-API/.env
+    command: poetry run celery -A config worker -l info
+    depends_on:
+      - db
+      - redis
+
+  web:
+    build:
+      context: ./folk-web
+      dockerfile: Dockerfile.prod
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    depends_on:
+      - api
+    ports:
+      - "3000:3000"
+
+volumes:
+  postgres_data:
+  media_data:
+  static_data:

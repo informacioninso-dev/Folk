@@ -28,8 +28,6 @@ interface EventoPublico {
 interface ParticipanteEncontrado {
   id: number;
   nombre_completo: string;
-  cedula: string;
-  edad: number;
 }
 
 // ─── Hook: buscar participante por cédula ─────────────────────────────────────
@@ -39,7 +37,7 @@ function useCedulaLookup(slug: string) {
 
   const buscar = useCallback(
     async (cedula: string): Promise<ParticipanteEncontrado | null> => {
-      if (cedula.length < 4) return null;
+      if (cedula.length < 6) return null;
       if (cedula in cache.current) return cache.current[cedula];
       const { data } = await axios.get<ParticipanteEncontrado | null>(
         `${BASE}/api/v1/registro-general/${slug}/buscar/`,
@@ -71,7 +69,7 @@ function CedulaInput({ label, slug, value, onChange, onParticipante }: CedulaInp
   const timer = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => {
-    if (value.length < 4) {
+    if (value.length < 6) {
       setEstado("idle");
       setNombre("");
       onParticipante(null);
@@ -126,15 +124,22 @@ function CedulaInput({ label, slug, value, onChange, onParticipante }: CedulaInp
 interface FileUploadProps {
   label: string;
   optional?: boolean;
+  kind: "photo" | "audio" | "comprobante";
   onUrl: (url: string) => void;
 }
 
-function FileUpload({ label, optional, onUrl }: FileUploadProps) {
+function FileUpload({ label, optional, kind, onUrl }: FileUploadProps) {
   const ref = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [done, setDone] = useState(false);
   const [fileName, setFileName] = useState("");
   const [error, setError] = useState("");
+  const accept =
+    kind === "photo"
+      ? ".jpg,.jpeg,.png,.webp"
+      : kind === "audio"
+      ? ".mp3,.wav,.m4a,.ogg"
+      : ".pdf,.jpg,.jpeg,.png,.webp";
 
   const handleChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -145,6 +150,7 @@ function FileUpload({ label, optional, onUrl }: FileUploadProps) {
     try {
       const fd = new FormData();
       fd.append("file", file);
+      fd.append("kind", kind);
       const { data } = await axios.post<{ url: string }>(`${BASE}/api/v1/upload/`, fd);
       onUrl(data.url);
       setDone(true);
@@ -176,7 +182,7 @@ function FileUpload({ label, optional, onUrl }: FileUploadProps) {
           <p className="text-sm text-gray-400">Haz clic para adjuntar</p>
         )}
       </div>
-      <input ref={ref} type="file" accept=".pdf,.jpg,.jpeg,.png,.mp3,.wav" className="hidden" onChange={handleChange} />
+      <input ref={ref} type="file" accept={accept} className="hidden" onChange={handleChange} />
       {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
     </div>
   );
@@ -442,12 +448,13 @@ export default function InscribirseModalidadPage() {
         {modalidad && (
           <div className="space-y-3 pt-1 border-t border-gray-100">
             <p className="text-sm font-medium text-gray-700">Archivos</p>
-            <FileUpload label="Foto del acto" optional onUrl={setFotoUrl} />
-            <FileUpload label="Pista musical" optional onUrl={setPistaUrl} />
+            <FileUpload label="Foto del acto" optional kind="photo" onUrl={setFotoUrl} />
+            <FileUpload label="Pista musical" optional kind="audio" onUrl={setPistaUrl} />
             {categoria && !categoria.incluido_full_pass && (
               <div>
                 <FileUpload
                   label={`Comprobante de pago de categoría${categoria.precio_adicional && Number(categoria.precio_adicional) > 0 ? ` ($${categoria.precio_adicional})` : ""}`}
+                  kind="comprobante"
                   onUrl={setComprobanteUrl}
                 />
               </div>

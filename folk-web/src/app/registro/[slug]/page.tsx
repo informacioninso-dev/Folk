@@ -6,6 +6,10 @@ import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import axios from "axios";
+import PrivacyConsent, {
+  createPrivacyConsentState,
+  validatePrivacyConsent,
+} from "@/features/portal/components/PrivacyConsent";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL;
 
@@ -13,9 +17,14 @@ const BASE = process.env.NEXT_PUBLIC_API_URL;
 
 interface EventoPublico {
   id: number;
+  slug: string;
   nombre: string;
   fecha: string;
   ubicacion: string;
+  version_politica_privacidad: string;
+  politica_privacidad_url: string;
+  aviso_privacidad_corto: string;
+  contacto_privacidad: string;
 }
 
 interface RegistroResult {
@@ -45,6 +54,7 @@ export default function RegistroPublicoPage() {
   const [notFound, setNotFound] = useState(false);
   const [result, setResult] = useState<RegistroResult | null>(null);
   const [serverError, setServerError] = useState("");
+  const [privacy, setPrivacy] = useState(createPrivacyConsentState);
 
   // File upload state
   const fileRef = useRef<HTMLInputElement>(null);
@@ -56,8 +66,12 @@ export default function RegistroPublicoPage() {
   const {
     register,
     handleSubmit,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({ resolver: zodResolver(schema) as Resolver<FormValues> });
+
+  const edad = watch("edad");
+  const requiresRepresentative = (typeof edad === "number" && edad < 18) || privacy.es_menor_edad;
 
   useEffect(() => {
     axios
@@ -76,6 +90,7 @@ export default function RegistroPublicoPage() {
     try {
       const fd = new FormData();
       fd.append("file", file);
+      fd.append("kind", "comprobante");
       const { data } = await axios.post<{ url: string }>(`${BASE}/api/v1/upload/`, fd);
       setUploadedUrl(data.url);
     } catch {
@@ -88,10 +103,15 @@ export default function RegistroPublicoPage() {
 
   const onSubmit = async (values: FormValues) => {
     setServerError("");
+    const privacyError = validatePrivacyConsent(privacy, { requiresRepresentative });
+    if (privacyError) {
+      setServerError(privacyError);
+      return;
+    }
     try {
       const { data } = await axios.post<RegistroResult>(
         `${BASE}/api/v1/registro-general/${slug}/`,
-        { ...values, comprobante_pago_url: uploadedUrl }
+        { ...values, comprobante_pago_url: uploadedUrl, ...privacy }
       );
       setResult(data);
     } catch (err: unknown) {
@@ -239,12 +259,22 @@ export default function RegistroPublicoPage() {
             <input
               ref={fileRef}
               type="file"
-              accept=".pdf,.jpg,.jpeg,.png"
+              accept=".pdf,.jpg,.jpeg,.png,.webp"
               className="hidden"
               onChange={handleFileChange}
             />
             {uploadError && <p className="text-xs text-red-500 mt-1">{uploadError}</p>}
           </div>
+
+          <PrivacyConsent
+            value={privacy}
+            onChange={setPrivacy}
+            notice={evento.aviso_privacidad_corto}
+            policyUrl={evento.politica_privacidad_url}
+            version={evento.version_politica_privacidad}
+            contactEmail={evento.contacto_privacidad}
+            forceRepresentative={requiresRepresentative}
+          />
 
           {serverError && (
             <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 py-2 text-sm">

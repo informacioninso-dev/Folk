@@ -4,6 +4,7 @@ from .models import (
     BloqueHorario,
     Calificacion,
     CategoriaRitmo,
+    ConsentimientoDatosPersonales,
     Cronograma,
     CriterioEvaluacion,
     Evento,
@@ -20,6 +21,7 @@ from .models import (
     Participante,
     ParticipanteGeneral,
     Ranking,
+    SiteConfig,
 )
 
 
@@ -151,6 +153,25 @@ class PagoCategoriaAdmin(admin.ModelAdmin):
     list_filter   = ("estado",)
     search_fields = ("pago_full_pass__cedula", "numero_comprobante")
     readonly_fields = ("created_at", "updated_at")
+
+
+@admin.register(ConsentimientoDatosPersonales)
+class ConsentimientoDatosPersonalesAdmin(admin.ModelAdmin):
+    list_display = ("flujo", "evento", "titular_nombre", "titular_documento", "es_menor_edad", "created_at")
+    list_filter = ("flujo", "evento", "es_menor_edad", "aceptado_por_representante")
+    search_fields = ("titular_nombre", "titular_documento", "titular_correo")
+    readonly_fields = ("created_at", "updated_at", "ip_address", "user_agent")
+
+
+@admin.register(SiteConfig)
+class SiteConfigAdmin(admin.ModelAdmin):
+    fields = (
+        "whatsapp_numero",
+        "whatsapp_mensaje",
+        "politica_privacidad_version",
+        "politica_privacidad_url",
+        "aviso_privacidad_corto",
+    )
 
 
 @admin.register(BloqueHorario)

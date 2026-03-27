@@ -25,7 +25,10 @@ export const eventosApi = {
   get: (id: number) =>
     apiClient.get<Evento>(`/eventos/${id}/`).then((r) => r.data),
 
-  create: (data: Omit<Evento, "id" | "slug" | "created_at">) =>
+  create: (
+    data: Pick<Evento, "nombre" | "fecha" | "ubicacion" | "activo"> &
+      Partial<Pick<Evento, "organizador">>
+  ) =>
     apiClient.post<Evento>("/eventos/", data).then((r) => r.data),
 
   update: (id: number, data: Partial<Omit<Evento, "id" | "slug" | "created_at">>) =>
