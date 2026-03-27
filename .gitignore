@@ -1,0 +1,35 @@
+# Python / Django
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+Folk-API/.env
+Folk-API/*.env
+Folk-API/db.sqlite3
+Folk-API/media/
+Folk-API/staticfiles/
+Folk-API/venv/
+Folk-API/.venv/
+Folk-API/env/
+*.egg-info/
+dist/
+build/
+
+# Node / Next.js
+folk-web/node_modules/
+folk-web/.next/
+folk-web/.env
+folk-web/*.env
+folk-web/.env.local
+folk-web/.env.*.local
+folk-web/out/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/settings.json
+.idea/
+*.swp
