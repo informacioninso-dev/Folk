@@ -205,7 +205,7 @@ function NuevoClienteModal({
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           {[
             { name: "nombre" as const, label: "Nombre de la empresa", placeholder: "Ej: Academia de Danza XYZ" },
-            { name: "nit_ruc" as const, label: "NIT / RUC", placeholder: "Número de identificación fiscal" },
+            { name: "nit_ruc" as const, label: "RUC", placeholder: "Número de identificación fiscal" },
             { name: "email_contacto" as const, label: "Email de contacto", placeholder: "contacto@empresa.com" },
             { name: "username" as const, label: "Usuario de acceso", placeholder: "nombre_usuario" },
             { name: "password" as const, label: "Contraseña inicial", placeholder: "Mínimo 8 caracteres" },

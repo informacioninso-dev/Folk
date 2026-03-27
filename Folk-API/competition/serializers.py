@@ -24,9 +24,65 @@ from .models import (
     ParticipanteGeneral,
     Ranking,
 )
+from .privacy import get_event_privacy_config, record_privacy_consent
+from .query_helpers import get_inscripciones_for_cedula
 from .tasks import send_inscripcion_confirmada_email, send_registro_pendiente_email
 
 User = get_user_model()
+
+
+class PrivacyConsentSerializerMixin(serializers.Serializer):
+    acepta_politica_privacidad = serializers.BooleanField(write_only=True)
+    es_menor_edad = serializers.BooleanField(write_only=True, required=False, default=False)
+    acepta_como_representante_legal = serializers.BooleanField(
+        write_only=True, required=False, default=False
+    )
+    nombre_representante_legal = serializers.CharField(
+        max_length=150, required=False, allow_blank=True, default="", write_only=True
+    )
+    cedula_representante_legal = serializers.CharField(
+        max_length=32, required=False, allow_blank=True, default="", write_only=True
+    )
+
+    def _validate_privacy_acceptance(self, attrs):
+        if not attrs.get("acepta_politica_privacidad"):
+            raise serializers.ValidationError(
+                {"acepta_politica_privacidad": "Debes aceptar el aviso de privacidad para continuar."}
+            )
+        return attrs
+
+    def _validate_legal_representative(self, attrs, *, requires_representative):
+        if not requires_representative:
+            return attrs
+
+        if not attrs.get("acepta_como_representante_legal"):
+            raise serializers.ValidationError(
+                {
+                    "acepta_como_representante_legal": (
+                        "Debes confirmar que actúas como representante legal del menor de edad."
+                    )
+                }
+            )
+
+        if not (attrs.get("nombre_representante_legal", "") or "").strip():
+            raise serializers.ValidationError(
+                {"nombre_representante_legal": "Ingresa el nombre del representante legal."}
+            )
+
+        if not (attrs.get("cedula_representante_legal", "") or "").strip():
+            raise serializers.ValidationError(
+                {"cedula_representante_legal": "Ingresa la cédula del representante legal."}
+            )
+
+        return attrs
+
+    def _privacy_minor_payload(self, attrs, *, requires_representative):
+        return {
+            "es_menor_edad": bool(requires_representative),
+            "aceptado_por_representante": bool(requires_representative),
+            "nombre_representante_legal": (attrs.get("nombre_representante_legal", "") or "").strip(),
+            "cedula_representante_legal": (attrs.get("cedula_representante_legal", "") or "").strip(),
+        }
 
 
 # ─── Organizador ──────────────────────────────────────────────────────────────
@@ -380,24 +436,55 @@ class CalificacionSerializer(serializers.ModelSerializer):
 # ─── Públicos (sin autenticación) ─────────────────────────────────────────────
 
 class EventoPublicoSerializer(serializers.ModelSerializer):
-    """Info del evento para la página pública de inscripción."""
+    """Public event info for registration pages."""
     categorias = serializers.SerializerMethodField()
+    version_politica_privacidad = serializers.SerializerMethodField()
+    politica_privacidad_url = serializers.SerializerMethodField()
+    aviso_privacidad_corto = serializers.SerializerMethodField()
+    contacto_privacidad = serializers.SerializerMethodField()
 
     class Meta:
         model = Evento
-        fields = ("id", "nombre", "fecha", "ubicacion", "categorias")
+        fields = (
+            "id",
+            "slug",
+            "nombre",
+            "fecha",
+            "ubicacion",
+            "categorias",
+            "version_politica_privacidad",
+            "politica_privacidad_url",
+            "aviso_privacidad_corto",
+            "contacto_privacidad",
+        )
 
     def get_categorias(self, obj):
         return CategoriaRitmoSerializer(obj.categorias_ritmo.all(), many=True).data
 
+    def get_version_politica_privacidad(self, obj):
+        return get_event_privacy_config(obj)["version"]
+
+    def get_politica_privacidad_url(self, obj):
+        return get_event_privacy_config(obj)["policy_url"]
+
+    def get_aviso_privacidad_corto(self, obj):
+        return get_event_privacy_config(obj)["notice"]
+
+    def get_contacto_privacidad(self, obj):
+        return get_event_privacy_config(obj)["contact_email"]
+
 
 class EventoPortalSerializer(serializers.ModelSerializer):
-    """Info completa del portal público de un evento."""
-    banner_url    = serializers.SerializerMethodField()
+    """Full public event info for the portal."""
+    banner_url = serializers.SerializerMethodField()
     organizador_nombre = serializers.CharField(source="organizador.nombre", read_only=True)
-    full_pass     = serializers.SerializerMethodField()
-    categorias    = serializers.SerializerMethodField()
+    full_pass = serializers.SerializerMethodField()
+    categorias = serializers.SerializerMethodField()
     ranking_revelado = serializers.SerializerMethodField()
+    version_politica_privacidad = serializers.SerializerMethodField()
+    politica_privacidad_url = serializers.SerializerMethodField()
+    aviso_privacidad_corto = serializers.SerializerMethodField()
+    contacto_privacidad = serializers.SerializerMethodField()
 
     def get_banner_url(self, obj):
         if not obj.banner:
@@ -425,12 +512,26 @@ class EventoPortalSerializer(serializers.ModelSerializer):
         except Exception:
             return False
 
+    def get_version_politica_privacidad(self, obj):
+        return get_event_privacy_config(obj)["version"]
+
+    def get_politica_privacidad_url(self, obj):
+        return get_event_privacy_config(obj)["policy_url"]
+
+    def get_aviso_privacidad_corto(self, obj):
+        return get_event_privacy_config(obj)["notice"]
+
+    def get_contacto_privacidad(self, obj):
+        return get_event_privacy_config(obj)["contact_email"]
+
     class Meta:
         model = Evento
         fields = (
             "id", "slug", "nombre", "fecha", "ubicacion",
             "organizador_nombre", "banner_url", "descripcion_portal",
             "full_pass", "categorias", "ranking_revelado",
+            "version_politica_privacidad", "politica_privacidad_url",
+            "aviso_privacidad_corto", "contacto_privacidad",
         )
 
 
@@ -453,8 +554,8 @@ class EventoHomepageSerializer(serializers.ModelSerializer):
         )
 
 
-class RegistroPublicoSerializer(serializers.Serializer):
-    """Inscripción pública sin autenticación."""
+class RegistroPublicoSerializer(PrivacyConsentSerializerMixin, serializers.Serializer):
+    """Public registration without authentication."""
     categoria_ritmo = serializers.PrimaryKeyRelatedField(
         queryset=CategoriaRitmo.objects.all()
     )
@@ -469,48 +570,97 @@ class RegistroPublicoSerializer(serializers.Serializer):
             raise serializers.ValidationError("Identificaciones duplicadas.")
         return value
 
+    def validate(self, attrs):
+        self._validate_privacy_acceptance(attrs)
+        requires_representative = bool(attrs.get("es_menor_edad")) or any(
+            participante.get("edad", 0) < 18 for participante in attrs.get("participantes", [])
+        )
+        self._validate_legal_representative(attrs, requires_representative=requires_representative)
+        attrs["__privacy_minor"] = self._privacy_minor_payload(
+            attrs, requires_representative=requires_representative
+        )
+        return attrs
+
     def create(self, validated_data):
         participantes_data = validated_data.pop("participantes")
+        validated_data.pop("acepta_politica_privacidad", None)
+        validated_data.pop("es_menor_edad", None)
+        validated_data.pop("acepta_como_representante_legal", None)
+        validated_data.pop("nombre_representante_legal", None)
+        validated_data.pop("cedula_representante_legal", None)
+        privacy_minor = validated_data.pop("__privacy_minor", {})
+        evento = self.context["evento"]
+        request = self.context.get("request")
+        titular = participantes_data[0]
         with transaction.atomic():
             inscripcion = Inscripcion.objects.create(**validated_data)
-            for p in participantes_data:
-                Participante.objects.create(inscripcion=inscripcion, **p)
+            for participante_data in participantes_data:
+                Participante.objects.create(inscripcion=inscripcion, **participante_data)
+            record_privacy_consent(
+                evento=evento,
+                flujo="inscripcion_categoria",
+                titular_nombre=titular["nombre_completo"],
+                titular_documento=titular["identificacion"],
+                titular_correo=titular.get("email", ""),
+                inscripcion=inscripcion,
+                request=request,
+                **privacy_minor,
+            )
             transaction.on_commit(
                 lambda: send_inscripcion_confirmada_email.delay(inscripcion.id)
             )
         return inscripcion
 
 
-# ─── Registro General Público ─────────────────────────────────────────────────
-
-class RegistroGeneralPublicoSerializer(serializers.Serializer):
-    """Registro público de ParticipanteGeneral sin autenticación."""
-    nombre_completo      = serializers.CharField(max_length=150)
-    cedula               = serializers.CharField(max_length=32)
-    edad                 = serializers.IntegerField(min_value=1, max_value=120)
-    correo_electronico   = serializers.EmailField()
-    telefono             = serializers.CharField(max_length=30)
+class RegistroGeneralPublicoSerializer(PrivacyConsentSerializerMixin, serializers.Serializer):
+    """Public registration of ParticipanteGeneral without authentication."""
+    nombre_completo = serializers.CharField(max_length=150)
+    cedula = serializers.CharField(max_length=32)
+    edad = serializers.IntegerField(min_value=1, max_value=120)
+    correo_electronico = serializers.EmailField()
+    telefono = serializers.CharField(max_length=30)
     comprobante_pago_url = serializers.URLField(required=False, allow_blank=True, default="")
 
     def validate(self, attrs):
         evento = self.context["evento"]
+        self._validate_privacy_acceptance(attrs)
         if ParticipanteGeneral.objects.filter(evento=evento, cedula=attrs["cedula"]).exists():
             raise serializers.ValidationError(
-                {"cedula": "Ya existe un registro con esa cédula para este evento."}
+                {"cedula": "Ya existe un registro con esa c?dula para este evento."}
             )
+        requires_representative = bool(attrs.get("es_menor_edad")) or attrs["edad"] < 18
+        self._validate_legal_representative(attrs, requires_representative=requires_representative)
+        attrs["__privacy_minor"] = self._privacy_minor_payload(
+            attrs, requires_representative=requires_representative
+        )
         return attrs
 
     def create(self, validated_data):
         evento = self.context["evento"]
+        request = self.context.get("request")
+        validated_data.pop("acepta_politica_privacidad", None)
+        validated_data.pop("es_menor_edad", None)
+        validated_data.pop("acepta_como_representante_legal", None)
+        validated_data.pop("nombre_representante_legal", None)
+        validated_data.pop("cedula_representante_legal", None)
+        privacy_minor = validated_data.pop("__privacy_minor", {})
         with transaction.atomic():
             pg = ParticipanteGeneral.objects.create(evento=evento, **validated_data)
+            record_privacy_consent(
+                evento=evento,
+                flujo="registro_general",
+                titular_nombre=pg.nombre_completo,
+                titular_documento=pg.cedula,
+                titular_correo=pg.correo_electronico,
+                participante_general=pg,
+                request=request,
+                **privacy_minor,
+            )
             transaction.on_commit(
                 lambda: send_registro_pendiente_email.delay(pg.id)
             )
         return pg
 
-
-# ─── Inscripción por modalidad (M2) ───────────────────────────────────────────
 
 class InscripcionModalidadSerializer(serializers.Serializer):
     """Crea Inscripcion + Pareja/Grupo según la modalidad de la categoría."""
@@ -608,7 +758,238 @@ class InscripcionModalidadSerializer(serializers.Serializer):
         return inscripcion
 
 
-# ─── Participante General ─────────────────────────────────────────────────────
+# ─── Registro de categoría portal (Full Pass) ─────────────────────────────────
+
+class RegistroCategoriaPortalSerializer(PrivacyConsentSerializerMixin, serializers.Serializer):
+    """
+    Creates Inscripcion for a participant with approved Full Pass.
+    """
+    cedula = serializers.CharField(max_length=32)
+    categoria_ritmo = serializers.PrimaryKeyRelatedField(queryset=CategoriaRitmo.objects.all())
+    nombre_acto = serializers.CharField(max_length=150, required=False, allow_blank=True, default="")
+    academia = serializers.CharField(max_length=150, required=False, allow_blank=True, default="")
+    foto_url = serializers.URLField(required=False, allow_blank=True, default="")
+    pista_musical_url = serializers.URLField(required=False, allow_blank=True, default="")
+    comprobante_categoria_url = serializers.URLField(required=False, allow_blank=True, default="")
+    cedula_2 = serializers.CharField(max_length=32, required=False, allow_blank=True, default="")
+    cedulas = serializers.ListField(child=serializers.CharField(), required=False, default=list)
+    representante = serializers.CharField(max_length=150, required=False, allow_blank=True, default="")
+    cedula_representante = serializers.CharField(max_length=32, required=False, allow_blank=True, default="")
+
+    def _get_full_pass(self, evento, cedula, campo):
+        cedula = cedula.strip()
+        try:
+            fp = PagoFullPass.objects.get(evento=evento, cedula=cedula)
+        except PagoFullPass.DoesNotExist:
+            raise serializers.ValidationError(
+                {campo: f"La c?dula {cedula} no tiene Full Pass registrado en este evento."}
+            )
+        if fp.estado != PagoFullPass.Estado.APROBADO:
+            raise serializers.ValidationError(
+                {campo: f"La c?dula {cedula} tiene Full Pass en estado '{fp.estado}', debe estar aprobado."}
+            )
+        return fp
+
+    def _check_duplicate(self, evento, cedula, categoria):
+        if get_inscripciones_for_cedula(evento, cedula).filter(categoria_ritmo=categoria).exists():
+            raise serializers.ValidationError(
+                {
+                    "error": (
+                        f"La c?dula {cedula} ya est? inscrita en "
+                        f"{categoria.nombre_ritmo} - {categoria.get_modalidad_display()}."
+                    )
+                }
+            )
+
+    def validate(self, attrs):
+        evento = self.context["evento"]
+        categoria = attrs["categoria_ritmo"]
+        self._validate_privacy_acceptance(attrs)
+        if categoria.evento_id != evento.id:
+            raise serializers.ValidationError(
+                {"categoria_ritmo": "Esta categor?a no pertenece a este evento."}
+            )
+
+        attrs["_evento"] = evento
+        attrs["_fp"] = self._get_full_pass(evento, attrs["cedula"], "cedula")
+        modalidad = categoria.modalidad
+
+        if not categoria.incluido_full_pass and not attrs.get("comprobante_categoria_url", "").strip():
+            raise serializers.ValidationError(
+                {"comprobante_categoria_url": "Debes adjuntar el comprobante de pago de esta categor?a."}
+            )
+
+        if modalidad == CategoriaRitmo.Modalidad.SOLISTA:
+            attrs["_portal_participantes"] = [attrs["_fp"]]
+            self._check_duplicate(evento, attrs["cedula"], categoria)
+        elif modalidad == CategoriaRitmo.Modalidad.PAREJA:
+            c2 = attrs.get("cedula_2", "").strip()
+            if not c2:
+                raise serializers.ValidationError(
+                    {"cedula_2": "Se requiere la c?dula del segundo participante."}
+                )
+            if c2 == attrs["cedula"].strip():
+                raise serializers.ValidationError(
+                    {"cedula_2": "Las dos c?dulas no pueden ser iguales."}
+                )
+            attrs["_fp2"] = self._get_full_pass(evento, c2, "cedula_2")
+            attrs["_portal_participantes"] = [attrs["_fp"], attrs["_fp2"]]
+            self._check_duplicate(evento, attrs["cedula"], categoria)
+            self._check_duplicate(evento, c2, categoria)
+        elif modalidad == CategoriaRitmo.Modalidad.GRUPO:
+            cedulas = [c.strip() for c in attrs.get("cedulas", []) if c.strip()]
+            if len(cedulas) < 3:
+                raise serializers.ValidationError(
+                    {"cedulas": "Un grupo requiere al menos 3 participantes."}
+                )
+            if len(cedulas) != len(set(cedulas)):
+                raise serializers.ValidationError(
+                    {"cedulas": "Hay c?dulas duplicadas en el grupo."}
+                )
+            if attrs["cedula"].strip() not in cedulas:
+                raise serializers.ValidationError(
+                    {"cedulas": "La lista del grupo debe incluir la c?dula del participante que realiza la inscripci?n."}
+                )
+            attrs["_fps_grupo"] = [self._get_full_pass(evento, c, "cedulas") for c in cedulas]
+            for ced in cedulas:
+                self._check_duplicate(evento, ced, categoria)
+            attrs["_cedulas_grupo"] = cedulas
+            attrs["_portal_participantes"] = attrs["_fps_grupo"]
+
+        participantes_pg = {
+            pg.cedula: pg
+            for pg in ParticipanteGeneral.objects.filter(
+                evento=evento,
+                cedula__in=[fp.cedula for fp in attrs["_portal_participantes"]],
+            )
+        }
+        attrs["_participantes_pg"] = participantes_pg
+        requires_representative = bool(attrs.get("es_menor_edad")) or any(
+            (pg.edad or 0) < 18 for pg in participantes_pg.values()
+        )
+        self._validate_legal_representative(attrs, requires_representative=requires_representative)
+        attrs["__privacy_minor"] = self._privacy_minor_payload(
+            attrs, requires_representative=requires_representative
+        )
+        return attrs
+
+    def _auto_nombre(self, evento, modalidad, fp):
+        if modalidad == CategoriaRitmo.Modalidad.SOLISTA:
+            return fp.nombre_completo
+        base = "Pareja" if modalidad == CategoriaRitmo.Modalidad.PAREJA else "Grupo"
+        count = PagoCategoria.objects.filter(
+            pago_full_pass__evento=evento,
+            inscripcion__categoria_ritmo__modalidad=modalidad,
+        ).count()
+        return f"{base} {count + 1}"
+
+    def create(self, validated_data):
+        categoria = validated_data["categoria_ritmo"]
+        modalidad = categoria.modalidad
+        incluido = categoria.incluido_full_pass
+        evento = validated_data["_evento"]
+        request = self.context.get("request")
+
+        validated_data.pop("acepta_politica_privacidad", None)
+        validated_data.pop("es_menor_edad", None)
+        validated_data.pop("acepta_como_representante_legal", None)
+        validated_data.pop("nombre_representante_legal", None)
+        validated_data.pop("cedula_representante_legal", None)
+        privacy_minor = validated_data.pop("__privacy_minor", {})
+
+        nombre = validated_data.get("nombre_acto", "").strip() or self._auto_nombre(
+            evento, modalidad, validated_data["_fp"]
+        )
+        representante = validated_data.get("representante", "").strip() or validated_data["_fp"].nombre_completo
+        cedula_representante = (
+            validated_data.get("cedula_representante", "").strip() or validated_data["_fp"].cedula
+        )
+        portal_participantes = validated_data["_portal_participantes"]
+        participantes_pg = validated_data.get("_participantes_pg", {})
+
+        with transaction.atomic():
+            estado_inscripcion = (
+                Inscripcion.EstadoInscripcion.APROBADA
+                if incluido else Inscripcion.EstadoInscripcion.PENDIENTE
+            )
+            inscripcion = Inscripcion.objects.create(
+                categoria_ritmo=categoria,
+                nombre_acto=nombre,
+                academia=validated_data.get("academia", ""),
+                foto_url=validated_data.get("foto_url", ""),
+                pista_musical_url=validated_data.get("pista_musical_url", ""),
+                comprobante_categoria_url=validated_data.get("comprobante_categoria_url", ""),
+                estado_inscripcion=estado_inscripcion,
+                participante_solista=(
+                    participantes_pg.get(validated_data["_fp"].cedula)
+                    if modalidad == CategoriaRitmo.Modalidad.SOLISTA else None
+                ),
+            )
+
+            for fp in portal_participantes:
+                participante_pg = participantes_pg.get(fp.cedula)
+                Participante.objects.create(
+                    inscripcion=inscripcion,
+                    nombre_completo=fp.nombre_completo,
+                    identificacion=fp.cedula,
+                    edad=participante_pg.edad if participante_pg else 0,
+                    email=(
+                        participante_pg.correo_electronico
+                        if participante_pg else fp.correo_electronico
+                    ),
+                )
+
+            if modalidad == CategoriaRitmo.Modalidad.PAREJA:
+                Pareja.objects.create(
+                    inscripcion=inscripcion,
+                    nombre=nombre,
+                    representante=representante,
+                    cedula_representante=cedula_representante,
+                    academia=validated_data.get("academia", ""),
+                    participante_1=participantes_pg.get(validated_data["_fp"].cedula),
+                    participante_2=participantes_pg.get(validated_data["_fp2"].cedula),
+                )
+            elif modalidad == CategoriaRitmo.Modalidad.GRUPO:
+                grupo = Grupo.objects.create(
+                    inscripcion=inscripcion,
+                    nombre=nombre,
+                    representante=representante,
+                    cedula_representante=cedula_representante,
+                    academia=validated_data.get("academia", ""),
+                )
+                participantes_grupo = [
+                    participantes_pg[cedula]
+                    for cedula in validated_data["_cedulas_grupo"]
+                    if cedula in participantes_pg
+                ]
+                if participantes_grupo:
+                    grupo.participantes.set(participantes_grupo)
+
+            estado_pago = (
+                PagoCategoria.Estado.APROBADO
+                if incluido else PagoCategoria.Estado.PENDIENTE
+            )
+            PagoCategoria.objects.create(
+                pago_full_pass=validated_data["_fp"],
+                inscripcion=inscripcion,
+                estado=estado_pago,
+            )
+            record_privacy_consent(
+                evento=evento,
+                flujo="inscripcion_categoria",
+                titular_nombre=validated_data["_fp"].nombre_completo,
+                titular_documento=validated_data["_fp"].cedula,
+                titular_correo=validated_data["_fp"].correo_electronico,
+                inscripcion=inscripcion,
+                request=request,
+                **privacy_minor,
+            )
+            transaction.on_commit(
+                lambda: send_inscripcion_confirmada_email.delay(inscripcion.id)
+            )
+
+        return inscripcion
+
 
 class ParticipanteGeneralSerializer(serializers.ModelSerializer):
     class Meta:
@@ -726,44 +1107,78 @@ class PagoFullPassSerializer(serializers.ModelSerializer):
         extra_kwargs = {"comprobante_imagen": {"write_only": True, "required": False}}
 
 
-class PagoFullPassPublicoSerializer(serializers.Serializer):
-    """Para que el participante registre/actualice su pago de Full Pass."""
-    cedula             = serializers.CharField(max_length=32)
-    nombre_completo    = serializers.CharField(max_length=150)
+class PagoFullPassPublicoSerializer(PrivacyConsentSerializerMixin, serializers.Serializer):
+    """Allows a participant to register or update their Full Pass payment."""
+    cedula = serializers.CharField(max_length=32)
+    nombre_completo = serializers.CharField(max_length=150)
     correo_electronico = serializers.EmailField()
-    telefono           = serializers.CharField(max_length=30, required=False, allow_blank=True, default="")
+    telefono = serializers.CharField(max_length=30, required=False, allow_blank=True, default="")
     comprobante_imagen = serializers.ImageField(required=False)
     numero_comprobante = serializers.CharField(max_length=100, required=False, allow_blank=True, default="")
 
     def validate(self, attrs):
         evento = self.context["evento"]
+        self._validate_privacy_acceptance(attrs)
         cedula = attrs["cedula"]
-        # Si ya existe un pago aprobado, no permitir duplicado
         existente = PagoFullPass.objects.filter(evento=evento, cedula=cedula).first()
         if existente and existente.estado == PagoFullPass.Estado.APROBADO:
             raise serializers.ValidationError(
-                {"cedula": "Esta cédula ya tiene un Full Pass aprobado para este evento."}
+                {"cedula": "Esta c?dula ya tiene un Full Pass aprobado para este evento."}
             )
+        participante_general = ParticipanteGeneral.objects.filter(evento=evento, cedula=cedula).first()
+        requires_representative = bool(attrs.get("es_menor_edad")) or bool(
+            participante_general and participante_general.edad < 18
+        )
+        self._validate_legal_representative(attrs, requires_representative=requires_representative)
         attrs["_existente"] = existente
+        attrs["_participante_general"] = participante_general
+        attrs["__privacy_minor"] = self._privacy_minor_payload(
+            attrs, requires_representative=requires_representative
+        )
         return attrs
 
     def create(self, validated_data):
-        evento     = self.context["evento"]
-        existente  = validated_data.pop("_existente")
+        evento = self.context["evento"]
+        request = self.context.get("request")
+        existente = validated_data.pop("_existente")
+        participante_general = validated_data.pop("_participante_general", None)
+        validated_data.pop("acepta_politica_privacidad", None)
+        validated_data.pop("es_menor_edad", None)
+        validated_data.pop("acepta_como_representante_legal", None)
+        validated_data.pop("nombre_representante_legal", None)
+        validated_data.pop("cedula_representante_legal", None)
+        privacy_minor = validated_data.pop("__privacy_minor", {})
+
         if existente:
-            # Reenvío de comprobante (si fue rechazado)
-            for field in ("comprobante_imagen", "numero_comprobante", "nombre_completo",
-                          "correo_electronico", "telefono"):
+            for field in (
+                "comprobante_imagen",
+                "numero_comprobante",
+                "nombre_completo",
+                "correo_electronico",
+                "telefono",
+            ):
                 if field in validated_data:
                     setattr(existente, field, validated_data[field])
             existente.estado = PagoFullPass.Estado.PENDIENTE
             existente.nota_rechazo = ""
             existente.save()
-            return existente
-        return PagoFullPass.objects.create(evento=evento, **validated_data)
+            pago = existente
+        else:
+            pago = PagoFullPass.objects.create(evento=evento, **validated_data)
 
+        record_privacy_consent(
+            evento=evento,
+            flujo="full_pass",
+            titular_nombre=pago.nombre_completo,
+            titular_documento=pago.cedula,
+            titular_correo=pago.correo_electronico,
+            pago_full_pass=pago,
+            participante_general=participante_general,
+            request=request,
+            **privacy_minor,
+        )
+        return pago
 
-# ─── Pago Categoría ───────────────────────────────────────────────────────────
 
 class PagoCategoriaSerializer(serializers.ModelSerializer):
     comprobante_imagen_url = serializers.SerializerMethodField()
@@ -825,7 +1240,13 @@ class MiAgendaItemSerializer(serializers.ModelSerializer):
 class SiteConfigSerializer(serializers.ModelSerializer):
     class Meta:
         model  = SiteConfig
-        fields = ("whatsapp_numero", "whatsapp_mensaje")
+        fields = (
+            "whatsapp_numero",
+            "whatsapp_mensaje",
+            "politica_privacidad_version",
+            "politica_privacidad_url",
+            "aviso_privacidad_corto",
+        )
 
 
 # ─── Ranking público por categoría ───────────────────────────────────────────

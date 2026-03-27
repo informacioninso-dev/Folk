@@ -3,7 +3,9 @@ import secrets
 import uuid
 
 from django.conf import settings
+from django.contrib.auth.password_validation import validate_password
 from django.core.files.storage import FileSystemStorage
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.contrib.auth import get_user_model
 from django.contrib.auth.tokens import default_token_generator
 from django.core.mail import send_mail
@@ -11,8 +13,10 @@ from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import IsAuthenticated, IsAdminUser, AllowAny
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.views import TokenObtainPairView
@@ -39,6 +43,7 @@ from .models import (
     ParticipanteGeneral,
     Ranking,
 )
+from .query_helpers import get_inscripciones_for_cedula
 from .serializers import (
     BloqueHorarioSerializer,
     SiteConfigSerializer,
@@ -69,6 +74,7 @@ from .serializers import (
     RankingCategoriaPublicoSerializer,
     RankingInscripcionSerializer,
     RankingSerializer,
+    RegistroCategoriaPortalSerializer,
     RegistroGeneralPublicoSerializer,
     RegistroPublicoSerializer,
 )
@@ -140,6 +146,142 @@ def _get_organizador(user):
     # Miembro del equipo
     org = Organizador.objects.filter(miembros=user).first()
     return org
+
+
+def _scope_queryset_to_event(qs, user, *, event_lookup="evento", allow_judge=False):
+    """Aplica multi-tenancy por evento para lecturas."""
+    if user.is_staff:
+        return qs
+
+    org = _get_organizador(user)
+    if org:
+        return qs.filter(**{f"{event_lookup}__organizador": org}).distinct()
+
+    if allow_judge:
+        return qs.filter(**{f"{event_lookup}__jueces__usuario": user}).distinct()
+
+    return qs.none()
+
+
+def _ensure_event_owner(user, evento, detail="Sin permiso para gestionar este recurso."):
+    """Permite mutaciones solo al staff o al organizador dueño del evento."""
+    if user.is_staff:
+        return
+
+    org = _get_organizador(user)
+    if org and evento.organizador_id == org.id:
+        return
+
+    raise PermissionDenied(detail)
+
+
+def _ensure_juez_owner(user, juez, detail="Solo el juez asignado puede modificar este recurso."):
+    if user.is_staff or juez.usuario_id == user.id:
+        return
+    raise PermissionDenied(detail)
+
+
+def _ensure_same_event(cronograma, inscripcion):
+    if inscripcion and inscripcion.categoria_ritmo.evento_id != cronograma.evento_id:
+        raise ValidationError(
+            {"inscripcion": "La inscripción no pertenece al evento del cronograma."}
+        )
+
+
+MIN_PUBLIC_LOOKUP_LENGTH = 6
+
+PUBLIC_UPLOAD_RULES = {
+    "photo": {
+        "extensions": {".jpg", ".jpeg", ".png", ".webp"},
+        "content_types": {"image/jpeg", "image/png", "image/webp"},
+        "max_bytes": 10 * 1024 * 1024,
+        "folder": "uploads/photo",
+    },
+    "audio": {
+        "extensions": {".mp3", ".wav", ".m4a", ".ogg"},
+        "content_types": {
+            "audio/mpeg",
+            "audio/mp3",
+            "audio/wav",
+            "audio/x-wav",
+            "audio/wave",
+            "audio/vnd.wave",
+            "audio/mp4",
+            "audio/x-m4a",
+            "audio/aac",
+            "audio/ogg",
+        },
+        "max_bytes": 25 * 1024 * 1024,
+        "folder": "uploads/audio",
+    },
+    "comprobante": {
+        "extensions": {".jpg", ".jpeg", ".png", ".webp", ".pdf"},
+        "content_types": {
+            "image/jpeg",
+            "image/png",
+            "image/webp",
+            "application/pdf",
+        },
+        "max_bytes": 10 * 1024 * 1024,
+        "folder": "uploads/comprobante",
+    },
+}
+
+
+class MethodScopedThrottleMixin:
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope_map = {}
+
+    def get_throttles(self):
+        scope = self.throttle_scope_map.get(self.request.method.lower())
+        if scope:
+            self.throttle_scope = scope
+        return super().get_throttles()
+
+
+def _normalize_public_lookup_value(value):
+    return (value or "").strip()
+
+
+def _validate_public_lookup_value(value, *, field_name="cedula"):
+    if len(value) < MIN_PUBLIC_LOOKUP_LENGTH:
+        raise ValidationError(
+            {field_name: f"Ingresa al menos {MIN_PUBLIC_LOOKUP_LENGTH} caracteres."}
+        )
+    return value
+
+
+def _mask_public_name(value):
+    parts = [part for part in (value or "").split() if part]
+    if not parts:
+        return ""
+    return " ".join(part[0] + ("*" * max(len(part) - 1, 0)) for part in parts)
+
+
+def _validate_public_upload(file, kind):
+    rule = PUBLIC_UPLOAD_RULES.get(kind)
+    if not rule:
+        raise ValidationError({"kind": "Tipo de archivo no permitido."})
+
+    ext = os.path.splitext(file.name)[1].lower()
+    if ext not in rule["extensions"]:
+        raise ValidationError(
+            {"file": "La extensión del archivo no está permitida para este tipo."}
+        )
+
+    content_type = (getattr(file, "content_type", "") or "").lower()
+    if content_type not in rule["content_types"]:
+        raise ValidationError(
+            {"file": "El tipo de archivo no está permitido para este upload."}
+        )
+
+    if file.size > rule["max_bytes"]:
+        max_mb = rule["max_bytes"] // (1024 * 1024)
+        raise ValidationError(
+            {"file": f"El archivo excede el límite de {max_mb} MB."}
+        )
+
+    return rule, ext
 
 
 # ─── ViewSets ────────────────────────────────────────────────────────────────
@@ -291,6 +433,13 @@ class OrganizadorViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
 
+class HealthCheckView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        return Response({"status": "ok"})
+
+
 class EventoViewSet(viewsets.ModelViewSet):
     queryset = Evento.objects.select_related("organizador").all()
     serializer_class = EventoSerializer
@@ -311,14 +460,30 @@ class EventoViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         if not request.user.is_staff:
             org = _get_organizador(request.user)
-            if org:
-                actuales = Evento.objects.filter(organizador=org).count()
-                if actuales >= org.max_eventos:
-                    return Response(
-                        {"detail": f"Límite de {org.max_eventos} evento(s) alcanzado. Contacta a Folk para ampliar tu plan."},
-                        status=status.HTTP_403_FORBIDDEN,
-                    )
+            if not org:
+                return Response(
+                    {"detail": "Solo organizadores o staff pueden crear eventos."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+            actuales = Evento.objects.filter(organizador=org).count()
+            if actuales >= org.max_eventos:
+                return Response(
+                    {"detail": f"Límite de {org.max_eventos} evento(s) alcanzado. Contacta a Folk para ampliar tu plan."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
         return super().create(request, *args, **kwargs)
+
+    def perform_create(self, serializer):
+        if self.request.user.is_staff:
+            serializer.save()
+            return
+        serializer.save(organizador=_get_organizador(self.request.user))
+
+    def perform_update(self, serializer):
+        if self.request.user.is_staff:
+            serializer.save()
+            return
+        serializer.save(organizador=_get_organizador(self.request.user))
 
 
     @action(detail=True, methods=["patch"], url_path="pago-folk",
@@ -390,13 +555,23 @@ class CategoriaRitmoViewSet(viewsets.ModelViewSet):
         evento_id = self.request.query_params.get("evento")
         if evento_id:
             qs = qs.filter(evento_id=evento_id)
-        if not self.request.user.is_staff:
-            org = _get_organizador(self.request.user)
-            if org:
-                qs = qs.filter(evento__organizador=org)
-            else:
-                qs = qs.filter(evento__jueces__usuario=self.request.user)
-        return qs
+        return _scope_queryset_to_event(
+            qs, self.request.user, event_lookup="evento", allow_judge=True
+        )
+
+    def perform_create(self, serializer):
+        evento = serializer.validated_data["evento"]
+        _ensure_event_owner(self.request.user, evento)
+        serializer.save()
+
+    def perform_update(self, serializer):
+        evento = serializer.validated_data.get("evento", serializer.instance.evento)
+        _ensure_event_owner(self.request.user, evento)
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        _ensure_event_owner(self.request.user, instance.evento)
+        instance.delete()
 
     @action(detail=True, methods=["get"], url_path="ranking")
     def ranking(self, request, pk=None):
@@ -445,11 +620,28 @@ class InscripcionViewSet(viewsets.ModelViewSet):
                 qs = qs.filter(
                     categoria_ritmo__evento__jueces__usuario=self.request.user
                 )
-        return qs
+        return qs.distinct()
+
+    def perform_create(self, serializer):
+        evento = serializer.validated_data["categoria_ritmo"].evento
+        _ensure_event_owner(self.request.user, evento)
+        serializer.save()
+
+    def perform_update(self, serializer):
+        categoria = serializer.validated_data.get(
+            "categoria_ritmo", serializer.instance.categoria_ritmo
+        )
+        _ensure_event_owner(self.request.user, categoria.evento)
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        _ensure_event_owner(self.request.user, instance.categoria_ritmo.evento)
+        instance.delete()
 
     @action(detail=True, methods=["post"], url_path="aprobar")
     def aprobar(self, request, pk=None):
         inscripcion = self.get_object()
+        _ensure_event_owner(request.user, inscripcion.categoria_ritmo.evento)
         inscripcion.estado_inscripcion = Inscripcion.EstadoInscripcion.APROBADA
         inscripcion.nota_rechazo = ""
         inscripcion.save(update_fields=["estado_inscripcion", "nota_rechazo", "updated_at"])
@@ -458,6 +650,7 @@ class InscripcionViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"], url_path="rechazar")
     def rechazar(self, request, pk=None):
         inscripcion = self.get_object()
+        _ensure_event_owner(request.user, inscripcion.categoria_ritmo.evento)
         nota = request.data.get("nota", "")
         inscripcion.estado_inscripcion = Inscripcion.EstadoInscripcion.RECHAZADA
         inscripcion.nota_rechazo = nota
@@ -475,7 +668,25 @@ class ParticipanteViewSet(viewsets.ModelViewSet):
         inscripcion_id = self.request.query_params.get("inscripcion")
         if inscripcion_id:
             qs = qs.filter(inscripcion_id=inscripcion_id)
-        return qs
+        return _scope_queryset_to_event(
+            qs,
+            self.request.user,
+            event_lookup="inscripcion__categoria_ritmo__evento",
+        )
+
+    def perform_create(self, serializer):
+        evento = serializer.validated_data["inscripcion"].categoria_ritmo.evento
+        _ensure_event_owner(self.request.user, evento)
+        serializer.save()
+
+    def perform_update(self, serializer):
+        inscripcion = serializer.validated_data.get("inscripcion", serializer.instance.inscripcion)
+        _ensure_event_owner(self.request.user, inscripcion.categoria_ritmo.evento)
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        _ensure_event_owner(self.request.user, instance.inscripcion.categoria_ritmo.evento)
+        instance.delete()
 
 
 class JuezViewSet(viewsets.ModelViewSet):
@@ -489,9 +700,33 @@ class JuezViewSet(viewsets.ModelViewSet):
         if evento_id:
             qs = qs.filter(evento_id=evento_id)
         mi_usuario = self.request.query_params.get("mi_usuario")
-        if mi_usuario in ("true", "1"):
-            qs = qs.filter(usuario=self.request.user)
-        return qs
+        if self.request.user.is_staff:
+            if mi_usuario in ("true", "1"):
+                qs = qs.filter(usuario=self.request.user)
+            return qs.distinct()
+
+        org = _get_organizador(self.request.user)
+        if org:
+            qs = qs.filter(evento__organizador=org)
+            if mi_usuario in ("true", "1"):
+                qs = qs.filter(usuario=self.request.user)
+            return qs.distinct()
+
+        return qs.filter(usuario=self.request.user).distinct()
+
+    def perform_create(self, serializer):
+        evento = serializer.validated_data["evento"]
+        _ensure_event_owner(self.request.user, evento)
+        serializer.save()
+
+    def perform_update(self, serializer):
+        evento = serializer.validated_data.get("evento", serializer.instance.evento)
+        _ensure_event_owner(self.request.user, evento)
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        _ensure_event_owner(self.request.user, instance.evento)
+        instance.delete()
 
     @action(detail=False, methods=["get"], url_path="mis-asignaciones")
     def mis_asignaciones(self, request):
@@ -542,7 +777,23 @@ class CriterioEvaluacionViewSet(viewsets.ModelViewSet):
         evento_id = self.request.query_params.get("evento")
         if evento_id:
             qs = qs.filter(evento_id=evento_id)
-        return qs
+        return _scope_queryset_to_event(
+            qs, self.request.user, event_lookup="evento", allow_judge=True
+        )
+
+    def perform_create(self, serializer):
+        evento = serializer.validated_data["evento"]
+        _ensure_event_owner(self.request.user, evento)
+        serializer.save()
+
+    def perform_update(self, serializer):
+        evento = serializer.validated_data.get("evento", serializer.instance.evento)
+        _ensure_event_owner(self.request.user, evento)
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        _ensure_event_owner(self.request.user, instance.evento)
+        instance.delete()
 
 
 class CalificacionViewSet(viewsets.ModelViewSet):
@@ -564,14 +815,43 @@ class CalificacionViewSet(viewsets.ModelViewSet):
             qs = qs.filter(juez_id=juez_id)
         if evento_id:
             qs = qs.filter(inscripcion__categoria_ritmo__evento_id=evento_id)
+        if self.request.user.is_staff:
+            if me in ("true", "1"):
+                qs = qs.filter(juez__usuario=self.request.user)
+            return qs.distinct()
+
+        org = _get_organizador(self.request.user)
+        if org:
+            qs = qs.filter(inscripcion__categoria_ritmo__evento__organizador=org)
+            if me in ("true", "1"):
+                qs = qs.filter(juez__usuario=self.request.user)
+            return qs.distinct()
+
+        qs = qs.filter(juez__usuario=self.request.user)
         if me in ("true", "1"):
-            mis_jueces = Juez.objects.filter(usuario=self.request.user).values_list("id", flat=True)
-            qs = qs.filter(juez_id__in=mis_jueces)
-        return qs
+            qs = qs.filter(juez__usuario=self.request.user)
+        return qs.distinct()
+
+    def perform_create(self, serializer):
+        _ensure_juez_owner(self.request.user, serializer.validated_data["juez"])
+        serializer.save()
+
+    def perform_update(self, serializer):
+        juez = serializer.validated_data.get("juez", serializer.instance.juez)
+        _ensure_juez_owner(self.request.user, juez)
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        _ensure_juez_owner(self.request.user, instance.juez)
+        instance.delete()
 
     @action(detail=True, methods=["post"], url_path="bloquear")
     def bloquear(self, request, pk=None):
         cal = self.get_object()
+        try:
+            _ensure_event_owner(request.user, cal.inscripcion.categoria_ritmo.evento)
+        except PermissionDenied:
+            _ensure_juez_owner(request.user, cal.juez)
         # Usar update() para evitar la restricción de save() al bloquear
         Calificacion.objects.filter(pk=cal.pk).update(bloqueada=True)
         cal.refresh_from_db()
@@ -582,12 +862,20 @@ class CalificacionViewSet(viewsets.ModelViewSet):
         inscripcion_id = request.data.get("inscripcion")
         if not inscripcion_id:
             return Response({"detail": "inscripcion requerida."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            inscripcion = Inscripcion.objects.select_related("categoria_ritmo__evento").get(
+                pk=inscripcion_id
+            )
+        except Inscripcion.DoesNotExist:
+            return Response({"detail": "Inscripción no encontrada."}, status=404)
+        _ensure_event_owner(request.user, inscripcion.categoria_ritmo.evento)
         count = Calificacion.objects.filter(inscripcion_id=inscripcion_id).update(bloqueada=True)
         return Response({"bloqueadas": count})
 
     @action(detail=True, methods=["post"], url_path="audio")
     def upload_audio(self, request, pk=None):
         cal = self.get_object()
+        _ensure_juez_owner(request.user, cal.juez)
         file = request.FILES.get("file")
         if not file:
             return Response({"detail": "No se recibió archivo."}, status=status.HTTP_400_BAD_REQUEST)
@@ -620,14 +908,30 @@ class ParticipanteGeneralViewSet(viewsets.ModelViewSet):
             elif self.request.user.participaciones.exists():
                 # Participante: solo ve sus propias participaciones
                 qs = qs.filter(usuario=self.request.user)
+            else:
+                qs = qs.none()
         estado = self.request.query_params.get("estado")
         if estado:
             qs = qs.filter(estado=estado)
         return qs
 
+    def perform_create(self, serializer):
+        _ensure_event_owner(self.request.user, serializer.validated_data["evento"])
+        serializer.save()
+
+    def perform_update(self, serializer):
+        evento = serializer.validated_data.get("evento", serializer.instance.evento)
+        _ensure_event_owner(self.request.user, evento)
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        _ensure_event_owner(self.request.user, instance.evento)
+        instance.delete()
+
     @action(detail=True, methods=["post"], url_path="aprobar")
     def aprobar(self, request, pk=None):
         participante = self.get_object()
+        _ensure_event_owner(request.user, participante.evento)
         User = get_user_model()
 
         plain_password = None
@@ -679,6 +983,7 @@ class ParticipanteGeneralViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"], url_path="rechazar")
     def rechazar(self, request, pk=None):
         participante = self.get_object()
+        _ensure_event_owner(request.user, participante.evento)
         nota = request.data.get("nota", "")
         participante.estado = ParticipanteGeneral.Estado.RECHAZADO
         participante.nota_rechazo = nota
@@ -693,11 +998,53 @@ class GrupoViewSet(viewsets.ModelViewSet):
     serializer_class = GrupoSerializer
     permission_classes = [IsAuthenticated]
 
+    def get_queryset(self):
+        return _scope_queryset_to_event(
+            super().get_queryset(),
+            self.request.user,
+            event_lookup="inscripcion__categoria_ritmo__evento",
+        )
+
+    def perform_create(self, serializer):
+        evento = serializer.validated_data["inscripcion"].categoria_ritmo.evento
+        _ensure_event_owner(self.request.user, evento)
+        serializer.save()
+
+    def perform_update(self, serializer):
+        inscripcion = serializer.validated_data.get("inscripcion", serializer.instance.inscripcion)
+        _ensure_event_owner(self.request.user, inscripcion.categoria_ritmo.evento)
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        _ensure_event_owner(self.request.user, instance.inscripcion.categoria_ritmo.evento)
+        instance.delete()
+
 
 class ParejaViewSet(viewsets.ModelViewSet):
     queryset = Pareja.objects.select_related("participante_1", "participante_2").all()
     serializer_class = ParejaSerializer
     permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return _scope_queryset_to_event(
+            super().get_queryset(),
+            self.request.user,
+            event_lookup="inscripcion__categoria_ritmo__evento",
+        )
+
+    def perform_create(self, serializer):
+        evento = serializer.validated_data["inscripcion"].categoria_ritmo.evento
+        _ensure_event_owner(self.request.user, evento)
+        serializer.save()
+
+    def perform_update(self, serializer):
+        inscripcion = serializer.validated_data.get("inscripcion", serializer.instance.inscripcion)
+        _ensure_event_owner(self.request.user, inscripcion.categoria_ritmo.evento)
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        _ensure_event_owner(self.request.user, instance.inscripcion.categoria_ritmo.evento)
+        instance.delete()
 
 
 # ─── Ranking ─────────────────────────────────────────────────────────────────
@@ -713,13 +1060,29 @@ class RankingViewSet(viewsets.ModelViewSet):
             org = _get_organizador(self.request.user)
             if org:
                 qs = qs.filter(evento__organizador=org)
+            else:
+                qs = qs.none()
         return qs
+
+    def perform_create(self, serializer):
+        _ensure_event_owner(self.request.user, serializer.validated_data["evento"])
+        serializer.save()
+
+    def perform_update(self, serializer):
+        evento = serializer.validated_data.get("evento", serializer.instance.evento)
+        _ensure_event_owner(self.request.user, evento)
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        _ensure_event_owner(self.request.user, instance.evento)
+        instance.delete()
 
     @action(detail=True, methods=["post"], url_path="publicar")
     def publicar(self, request, pk=None):
         from django.utils import timezone
         from .tasks import send_ranking_publicado_email
         ranking = self.get_object()
+        _ensure_event_owner(request.user, ranking.evento)
         ranking.estado = Ranking.Estado.PUBLICADO
         ranking.publicado_en = timezone.now()
         ranking.save(update_fields=["estado", "publicado_en", "updated_at"])
@@ -736,14 +1099,23 @@ class CronogramaViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = super().get_queryset()
-        if not self.request.user.is_staff:
-            org = _get_organizador(self.request.user)
-            if org:
-                qs = qs.filter(evento__organizador=org)
         evento_id = self.request.query_params.get("evento")
         if evento_id:
             qs = qs.filter(evento_id=evento_id)
-        return qs
+        return _scope_queryset_to_event(qs, self.request.user, event_lookup="evento")
+
+    def perform_create(self, serializer):
+        _ensure_event_owner(self.request.user, serializer.validated_data["evento"])
+        serializer.save()
+
+    def perform_update(self, serializer):
+        evento = serializer.validated_data.get("evento", serializer.instance.evento)
+        _ensure_event_owner(self.request.user, evento)
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        _ensure_event_owner(self.request.user, instance.evento)
+        instance.delete()
 
 
 class ItemCronogramaViewSet(viewsets.ModelViewSet):
@@ -756,11 +1128,31 @@ class ItemCronogramaViewSet(viewsets.ModelViewSet):
         cronograma_id = self.request.query_params.get("cronograma")
         if cronograma_id:
             qs = qs.filter(cronograma_id=cronograma_id)
-        return qs
+        return _scope_queryset_to_event(
+            qs, self.request.user, event_lookup="cronograma__evento"
+        )
+
+    def perform_create(self, serializer):
+        cronograma = serializer.validated_data["cronograma"]
+        _ensure_event_owner(self.request.user, cronograma.evento)
+        _ensure_same_event(cronograma, serializer.validated_data.get("inscripcion"))
+        serializer.save()
+
+    def perform_update(self, serializer):
+        cronograma = serializer.validated_data.get("cronograma", serializer.instance.cronograma)
+        _ensure_event_owner(self.request.user, cronograma.evento)
+        inscripcion = serializer.validated_data.get("inscripcion", serializer.instance.inscripcion)
+        _ensure_same_event(cronograma, inscripcion)
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        _ensure_event_owner(self.request.user, instance.cronograma.evento)
+        instance.delete()
 
     @action(detail=True, methods=["post"], url_path="tiempo-extra")
     def tiempo_extra(self, request, pk=None):
         item = self.get_object()
+        _ensure_event_owner(request.user, item.cronograma.evento)
         segundos = int(request.data.get("segundos", 30))
         item.tiempo_extra += segundos
         item.save(update_fields=["tiempo_extra", "updated_at"])
@@ -773,6 +1165,8 @@ class UsuarioBuscarView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        if not request.user.is_staff and not _get_organizador(request.user):
+            return Response({"detail": "Sin permiso."}, status=status.HTTP_403_FORBIDDEN)
         username = request.query_params.get("username", "").strip()
         if len(username) < 2:
             return Response([])
@@ -785,8 +1179,9 @@ class UsuarioBuscarView(APIView):
 
 # ─── Registro público (sin autenticación) ────────────────────────────────────
 
-class RegistroPublicoView(APIView):
+class RegistroPublicoView(MethodScopedThrottleMixin, APIView):
     permission_classes = [AllowAny]
+    throttle_scope_map = {"post": "public_registration"}
 
     def get(self, request, slug):
         try:
@@ -795,39 +1190,30 @@ class RegistroPublicoView(APIView):
             )
         except Evento.DoesNotExist:
             return Response(
-                {"detail": "Evento no encontrado o no está activo."},
+                {"detail": "Evento no encontrado o no est? activo."},
                 status=status.HTTP_404_NOT_FOUND,
             )
-        return Response(EventoPublicoSerializer(evento).data)
+        return Response(EventoPublicoSerializer(evento, context={"request": request}).data)
 
     def post(self, request, slug):
         try:
             evento = Evento.objects.get(slug=slug, activo=True)
         except Evento.DoesNotExist:
             return Response(
-                {"detail": "Evento no encontrado o no está activo."},
+                {"detail": "Evento no encontrado o no est? activo."},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        serializer = RegistroPublicoSerializer(data=request.data)
+        serializer = RegistroPublicoSerializer(
+            data=request.data, context={"evento": evento, "request": request}
+        )
         serializer.is_valid(raise_exception=True)
-
-        # Validar que la categoría pertenece al evento
-        categoria = serializer.validated_data["categoria_ritmo"]
-        if categoria.evento_id != evento.id:
-            return Response(
-                {"detail": "La categoría no pertenece a este evento."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
         inscripcion = serializer.save()
         return Response(
-            InscripcionSerializer(inscripcion).data,
+            {"id": inscripcion.id, "nombre_acto": inscripcion.nombre_acto},
             status=status.HTTP_201_CREATED,
         )
 
-
-# ─── Ranking público (sin autenticación) ─────────────────────────────────────
 
 class RankingPublicoView(APIView):
     permission_classes = [AllowAny]
@@ -841,12 +1227,13 @@ class RankingPublicoView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        # Phase 9: solo mostrar si el ranking fue publicado
         try:
-            ranking_obj = Ranking.objects.get(evento=evento, estado=Ranking.Estado.PUBLICADO)
+            ranking_obj = Ranking.objects.get(
+                evento=evento, estado=Ranking.Estado.PUBLICADO
+            )
         except Ranking.DoesNotExist:
             return Response(
-                {"detail": "El ranking aún no ha sido publicado.", "publicado": False},
+                {"detail": "El ranking aun no ha sido publicado.", "publicado": False},
                 status=status.HTTP_403_FORBIDDEN,
             )
 
@@ -884,29 +1271,35 @@ class RankingPublicoView(APIView):
         })
 
 
-# ─── Upload de archivos (sin autenticación) ──────────────────────────────────
-
-class UploadView(APIView):
+class UploadView(MethodScopedThrottleMixin, APIView):
     permission_classes = [AllowAny]
+    throttle_scope_map = {"post": "upload_public"}
 
     def post(self, request):
         file = request.FILES.get("file")
+        kind = (request.data.get("kind", "") or "").strip()
         if not file:
-            return Response({"detail": "No se recibió ningún archivo."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"detail": "No se recibio ningun archivo."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not kind:
+            return Response(
+                {"detail": "Debes indicar el tipo de archivo."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-        # Guardar con nombre único en /media/comprobantes/
-        ext = os.path.splitext(file.name)[1].lower()
-        filename = f"comprobantes/{uuid.uuid4().hex}{ext}"
+        rule, ext = _validate_public_upload(file, kind)
+        filename = f"{rule['folder']}/{uuid.uuid4().hex}{ext}"
         fs = FileSystemStorage()
         saved = fs.save(filename, file)
         url = request.build_absolute_uri(settings.MEDIA_URL + saved)
         return Response({"url": url}, status=status.HTTP_201_CREATED)
 
 
-# ─── Registro general público (M1) ───────────────────────────────────────────
-
-class RegistroGeneralPublicoView(APIView):
+class RegistroGeneralPublicoView(MethodScopedThrottleMixin, APIView):
     permission_classes = [AllowAny]
+    throttle_scope_map = {"post": "public_registration"}
 
     def get(self, request, slug):
         try:
@@ -915,22 +1308,22 @@ class RegistroGeneralPublicoView(APIView):
             )
         except Evento.DoesNotExist:
             return Response(
-                {"detail": "Evento no encontrado o no está activo."},
+                {"detail": "Evento no encontrado o no est? activo."},
                 status=status.HTTP_404_NOT_FOUND,
             )
-        return Response(EventoPublicoSerializer(evento).data)
+        return Response(EventoPublicoSerializer(evento, context={"request": request}).data)
 
     def post(self, request, slug):
         try:
             evento = Evento.objects.get(slug=slug, activo=True)
         except Evento.DoesNotExist:
             return Response(
-                {"detail": "Evento no encontrado o no está activo."},
+                {"detail": "Evento no encontrado o no est? activo."},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
         serializer = RegistroGeneralPublicoSerializer(
-            data=request.data, context={"evento": evento}
+            data=request.data, context={"evento": evento, "request": request}
         )
         serializer.is_valid(raise_exception=True)
         pg = serializer.save()
@@ -940,15 +1333,13 @@ class RegistroGeneralPublicoView(APIView):
         )
 
 
-# ─── Búsqueda de participante por cédula (M2) ────────────────────────────────
-
-class BuscarParticipanteView(APIView):
+class BuscarParticipanteView(MethodScopedThrottleMixin, APIView):
     permission_classes = [AllowAny]
+    throttle_scope_map = {"get": "participant_lookup"}
 
     def get(self, request, slug):
-        cedula = request.query_params.get("cedula", "").strip()
-        if len(cedula) < 4:
-            return Response(None)
+        cedula = _normalize_public_lookup_value(request.query_params.get("cedula", ""))
+        _validate_public_lookup_value(cedula)
         try:
             evento = Evento.objects.get(slug=slug, activo=True)
         except Evento.DoesNotExist:
@@ -959,15 +1350,11 @@ class BuscarParticipanteView(APIView):
             )
             return Response({
                 "id": pg.id,
-                "nombre_completo": pg.nombre_completo,
-                "cedula": pg.cedula,
-                "edad": pg.edad,
+                "nombre_completo": _mask_public_name(pg.nombre_completo),
             })
         except ParticipanteGeneral.DoesNotExist:
             return Response(None)
 
-
-# ─── Inscripción por modalidad (M2) ───────────────────────────────────────────
 
 class InscripcionModalidadView(APIView):
     permission_classes = [IsAuthenticated]
@@ -981,7 +1368,7 @@ class InscripcionModalidadView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
         serializer = InscripcionModalidadSerializer(
-            data=request.data, context={"evento": evento}
+            data=request.data, context={"evento": evento, "request": request}
         )
         serializer.is_valid(raise_exception=True)
         inscripcion = serializer.save()
@@ -1022,8 +1409,9 @@ class CronogramaLiveView(APIView):
 
 # ─── Recuperar contraseña ─────────────────────────────────────────────────────
 
-class PasswordResetView(APIView):
+class PasswordResetView(MethodScopedThrottleMixin, APIView):
     permission_classes = [AllowAny]
+    throttle_scope_map = {"post": "password_reset"}
 
     def post(self, request):
         email = request.data.get("email", "").strip()
@@ -1036,24 +1424,24 @@ class PasswordResetView(APIView):
             token = default_token_generator.make_token(user)
             reset_url = f"{settings.FRONTEND_URL}/reset-password/{uid}/{token}"
             send_mail(
-                subject="Recuperar contraseña — Folk",
+                subject="Recuperar contrase?a - Folk",
                 message=(
-                    f"Hola {user.username},\n\n"
-                    f"Haz clic en el siguiente enlace para restablecer tu contraseña:\n"
+                    f"Hola {user.username}\n\n"
+                    "Haz clic en el siguiente enlace para restablecer tu contrase?a:\n"
                     f"{reset_url}\n\n"
-                    f"El enlace expira en 24 horas.\n"
+                    "El enlace expira en 24 horas.\n"
                     f"Si no solicitaste esto, ignora este mensaje."
                 ),
                 from_email=settings.DEFAULT_FROM_EMAIL,
                 recipient_list=[email],
             )
 
-        # Siempre devolver 200 para no revelar si el email existe
-        return Response({"detail": "Si el correo está registrado, recibirás un enlace."})
+        return Response({"detail": "Si el correo est? registrado, recibir?s un enlace."})
 
 
-class PasswordResetConfirmView(APIView):
+class PasswordResetConfirmView(MethodScopedThrottleMixin, APIView):
     permission_classes = [AllowAny]
+    throttle_scope_map = {"post": "password_reset_confirm"}
 
     def post(self, request):
         uid = request.data.get("uid", "")
@@ -1063,31 +1451,28 @@ class PasswordResetConfirmView(APIView):
         if not all([uid, token, new_password]):
             return Response({"detail": "Datos incompletos."}, status=status.HTTP_400_BAD_REQUEST)
 
-        if len(new_password) < 8:
-            return Response(
-                {"detail": "La contraseña debe tener al menos 8 caracteres."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
         User = get_user_model()
         try:
             pk = force_str(urlsafe_base64_decode(uid))
             user = User.objects.get(pk=pk, is_active=True)
         except Exception:
-            return Response({"detail": "Enlace inválido."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"detail": "Enlace invalido."}, status=status.HTTP_400_BAD_REQUEST)
 
         if not default_token_generator.check_token(user, token):
             return Response(
-                {"detail": "El enlace ha expirado o es inválido."},
+                {"detail": "El enlace ha expirado o es invalido."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        try:
+            validate_password(new_password, user=user)
+        except DjangoValidationError as exc:
+            return Response({"new_password": list(exc.messages)}, status=status.HTTP_400_BAD_REQUEST)
+
         user.set_password(new_password)
         user.save()
-        return Response({"detail": "Contraseña restablecida exitosamente."})
+        return Response({"detail": "Contrasena restablecida exitosamente."})
 
-
-# ─── Configuración global del sitio ──────────────────────────────────────────
 
 class SiteConfigView(APIView):
     """GET público / PATCH solo staff."""
@@ -1165,17 +1550,32 @@ class FullPassConfigViewSet(viewsets.ModelViewSet):
                 qs = qs.none()
         return qs
 
+    def perform_create(self, serializer):
+        _ensure_event_owner(self.request.user, serializer.validated_data["evento"])
+        serializer.save()
+
+    def perform_update(self, serializer):
+        evento = serializer.validated_data.get("evento", serializer.instance.evento)
+        _ensure_event_owner(self.request.user, evento)
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        _ensure_event_owner(self.request.user, instance.evento)
+        instance.delete()
+
 
 # ─── Pago Full Pass — portal público ─────────────────────────────────────────
 
-class PagoFullPassPublicoView(APIView):
+class PagoFullPassPublicoView(MethodScopedThrottleMixin, APIView):
     permission_classes = [AllowAny]
+    throttle_scope_map = {"get": "portal_lookup", "post": "portal_submit"}
 
     def get(self, request, slug):
-        """Consulta estado del Full Pass por cédula."""
-        cedula = request.query_params.get("cedula", "").strip()
+        """Consulta estado del Full Pass por cedula."""
+        cedula = _normalize_public_lookup_value(request.query_params.get("cedula", ""))
         if not cedula:
             return Response({"detail": "cedula requerida."}, status=400)
+        _validate_public_lookup_value(cedula)
         try:
             evento = Evento.objects.get(slug=slug, portal_activo=True, pago_folk_confirmado=True)
         except Evento.DoesNotExist:
@@ -1184,8 +1584,7 @@ class PagoFullPassPublicoView(APIView):
             pago = PagoFullPass.objects.get(evento=evento, cedula=cedula)
             return Response({
                 "estado": pago.estado,
-                "nombre_completo": pago.nombre_completo,
-                "cedula": pago.cedula,
+                "nombre_completo": _mask_public_name(pago.nombre_completo),
             })
         except PagoFullPass.DoesNotExist:
             return Response(None)
@@ -1198,7 +1597,7 @@ class PagoFullPassPublicoView(APIView):
             return Response({"detail": "Evento no encontrado."}, status=404)
 
         serializer = PagoFullPassPublicoSerializer(
-            data=request.data, context={"evento": evento}
+            data=request.data, context={"evento": evento, "request": request}
         )
         serializer.is_valid(raise_exception=True)
         pago = serializer.save()
@@ -1207,8 +1606,6 @@ class PagoFullPassPublicoView(APIView):
             status=status.HTTP_201_CREATED,
         )
 
-
-# ─── Pago Full Pass — admin ────────────────────────────────────────────────────
 
 class PagoFullPassAdminViewSet(viewsets.ModelViewSet):
     queryset = PagoFullPass.objects.select_related("evento").all()
@@ -1231,6 +1628,19 @@ class PagoFullPassAdminViewSet(viewsets.ModelViewSet):
                 qs = qs.none()
         return qs
 
+    def perform_create(self, serializer):
+        _ensure_event_owner(self.request.user, serializer.validated_data["evento"])
+        serializer.save()
+
+    def perform_update(self, serializer):
+        evento = serializer.validated_data.get("evento", serializer.instance.evento)
+        _ensure_event_owner(self.request.user, evento)
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        _ensure_event_owner(self.request.user, instance.evento)
+        instance.delete()
+
     @action(detail=True, methods=["post"], url_path="aprobar")
     def aprobar(self, request, pk=None):
         pago = self.get_object()
@@ -1251,12 +1661,15 @@ class PagoFullPassAdminViewSet(viewsets.ModelViewSet):
 
 # ─── Registro de categorías (requiere Full Pass aprobado) ─────────────────────
 
-class RegistroCategoriaPublicoView(APIView):
+class RegistroCategoriaPublicoView(MethodScopedThrottleMixin, APIView):
     permission_classes = [AllowAny]
+    throttle_scope_map = {"get": "portal_lookup", "post": "portal_submit"}
 
     def get(self, request, slug):
-        """Lista las categorías disponibles y el estado del Full Pass."""
-        cedula = request.query_params.get("cedula", "").strip()
+        """Lista las categorias disponibles y el estado del Full Pass."""
+        cedula = _normalize_public_lookup_value(request.query_params.get("cedula", ""))
+        if cedula:
+            _validate_public_lookup_value(cedula)
         try:
             evento = Evento.objects.prefetch_related("categorias_ritmo").get(
                 slug=slug, portal_activo=True, pago_folk_confirmado=True
@@ -1271,33 +1684,16 @@ class RegistroCategoriaPublicoView(APIView):
             try:
                 pago_fp = PagoFullPass.objects.get(evento=evento, cedula=cedula)
                 full_pass_estado = pago_fp.estado
-                # Inscripciones ya registradas por este participante
-                inscs = Inscripcion.objects.filter(
-                    participante_solista__cedula=cedula,
-                    categoria_ritmo__evento=evento,
-                ).select_related("categoria_ritmo")
-                inscs2_pareja = Inscripcion.objects.filter(
-                    pareja__participante_1__cedula=cedula,
-                    categoria_ritmo__evento=evento,
-                ).select_related("categoria_ritmo")
-                inscs3_pareja = Inscripcion.objects.filter(
-                    pareja__participante_2__cedula=cedula,
-                    categoria_ritmo__evento=evento,
-                ).select_related("categoria_ritmo")
-                inscs4_grupo = Inscripcion.objects.filter(
-                    grupo__participantes__cedula=cedula,
-                    categoria_ritmo__evento=evento,
-                ).select_related("categoria_ritmo")
-                all_inscs = list(inscs) + list(inscs2_pareja) + list(inscs3_pareja) + list(inscs4_grupo)
                 inscripciones_existentes = [
                     {
                         "id": i.id,
                         "nombre_acto": i.nombre_acto,
                         "ritmo": i.categoria_ritmo.nombre_ritmo,
                         "modalidad": i.categoria_ritmo.modalidad,
+                        "categoria_ritmo_id": i.categoria_ritmo.id,
                         "estado": i.estado_inscripcion,
                     }
-                    for i in all_inscs
+                    for i in get_inscripciones_for_cedula(evento, cedula)
                 ]
             except PagoFullPass.DoesNotExist:
                 full_pass_estado = None
@@ -1308,8 +1704,23 @@ class RegistroCategoriaPublicoView(APIView):
             "inscripciones_existentes": inscripciones_existentes,
         })
 
+    def post(self, request, slug):
+        """Inscribir en una categoria a un participante con Full Pass aprobado."""
+        try:
+            evento = Evento.objects.get(slug=slug, portal_activo=True, pago_folk_confirmado=True)
+        except Evento.DoesNotExist:
+            return Response({"detail": "Evento no encontrado."}, status=404)
 
-# ─── Pago Categoría — admin ────────────────────────────────────────────────────
+        serializer = RegistroCategoriaPortalSerializer(
+            data=request.data, context={"evento": evento, "request": request}
+        )
+        serializer.is_valid(raise_exception=True)
+        inscripcion = serializer.save()
+        return Response(
+            {"id": inscripcion.id, "estado": inscripcion.estado_inscripcion},
+            status=status.HTTP_201_CREATED,
+        )
+
 
 class PagoCategoriaAdminViewSet(viewsets.ModelViewSet):
     queryset = PagoCategoria.objects.select_related(
@@ -1337,6 +1748,22 @@ class PagoCategoriaAdminViewSet(viewsets.ModelViewSet):
                 qs = qs.none()
         return qs
 
+    def perform_create(self, serializer):
+        evento = serializer.validated_data["pago_full_pass"].evento
+        _ensure_event_owner(self.request.user, evento)
+        serializer.save()
+
+    def perform_update(self, serializer):
+        pago_full_pass = serializer.validated_data.get(
+            "pago_full_pass", serializer.instance.pago_full_pass
+        )
+        _ensure_event_owner(self.request.user, pago_full_pass.evento)
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        _ensure_event_owner(self.request.user, instance.pago_full_pass.evento)
+        instance.delete()
+
     @action(detail=True, methods=["post"], url_path="aprobar")
     def aprobar(self, request, pk=None):
         pago = self.get_object()
@@ -1360,38 +1787,32 @@ class PagoCategoriaAdminViewSet(viewsets.ModelViewSet):
 
 # ─── Mi Agenda pública (búsqueda por cédula) ──────────────────────────────────
 
-class MiAgendaView(APIView):
+class MiAgendaView(MethodScopedThrottleMixin, APIView):
     permission_classes = [AllowAny]
+    throttle_scope_map = {"get": "agenda_lookup"}
 
     def get(self, request, slug):
-        cedula = request.query_params.get("cedula", "").strip()
+        cedula = _normalize_public_lookup_value(request.query_params.get("cedula", ""))
         if not cedula:
             return Response({"detail": "cedula requerida."}, status=400)
+        _validate_public_lookup_value(cedula)
 
         try:
             evento = Evento.objects.get(slug=slug, portal_activo=True, pago_folk_confirmado=True)
         except Evento.DoesNotExist:
             return Response({"detail": "Evento no encontrado."}, status=404)
 
-        # Buscar todas las inscripciones del participante en este evento
-        from django.db.models import Q
         inscripcion_ids = set(
-            Inscripcion.objects.filter(
-                Q(participante_solista__cedula=cedula) |
-                Q(pareja__participante_1__cedula=cedula) |
-                Q(pareja__participante_2__cedula=cedula) |
-                Q(grupo__participantes__cedula=cedula),
-                categoria_ritmo__evento=evento,
-            ).values_list("id", flat=True)
+            get_inscripciones_for_cedula(evento, cedula).values_list("id", flat=True)
         )
 
         if not inscripcion_ids:
-            return Response({"cedula": cedula, "items": []})
+            return Response({"items": []})
 
         try:
             cronograma = Cronograma.objects.get(evento=evento)
         except Cronograma.DoesNotExist:
-            return Response({"cedula": cedula, "items": []})
+            return Response({"items": []})
 
         items = ItemCronograma.objects.filter(
             cronograma=cronograma,
@@ -1401,12 +1822,9 @@ class MiAgendaView(APIView):
         ).order_by("fecha", "orden")
 
         return Response({
-            "cedula": cedula,
             "items": MiAgendaItemSerializer(items, many=True).data,
         })
 
-
-# ─── Ranking portal público (top 3 por ritmo/modalidad) ──────────────────────
 
 class RankingPortalView(APIView):
     permission_classes = [AllowAny]
@@ -1473,6 +1891,19 @@ class BloqueHorarioViewSet(viewsets.ModelViewSet):
                 qs = qs.none()
         return qs
 
+    def perform_create(self, serializer):
+        _ensure_event_owner(self.request.user, serializer.validated_data["evento"])
+        serializer.save()
+
+    def perform_update(self, serializer):
+        evento = serializer.validated_data.get("evento", serializer.instance.evento)
+        _ensure_event_owner(self.request.user, evento)
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        _ensure_event_owner(self.request.user, instance.evento)
+        instance.delete()
+
 
 # ─── Orden Ritmo Agenda (admin) ───────────────────────────────────────────────
 
@@ -1493,6 +1924,19 @@ class OrdenRitmoAgendaViewSet(viewsets.ModelViewSet):
             else:
                 qs = qs.none()
         return qs
+
+    def perform_create(self, serializer):
+        _ensure_event_owner(self.request.user, serializer.validated_data["evento"])
+        serializer.save()
+
+    def perform_update(self, serializer):
+        evento = serializer.validated_data.get("evento", serializer.instance.evento)
+        _ensure_event_owner(self.request.user, evento)
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        _ensure_event_owner(self.request.user, instance.evento)
+        instance.delete()
 
 
 # ─── Generador de agenda (3 modos) ────────────────────────────────────────────

@@ -31,6 +31,7 @@ export interface CategoriaRitmo {
   edad_min: number | null;
   edad_max: number | null;
   precio_adicional: string;
+  incluido_full_pass: boolean;
 }
 
 export interface EventoPortal {
@@ -45,6 +46,10 @@ export interface EventoPortal {
   full_pass: FullPassConfig | null;
   categorias: CategoriaRitmo[];
   ranking_revelado: boolean;
+  version_politica_privacidad: string;
+  politica_privacidad_url: string;
+  aviso_privacidad_corto: string;
+  contacto_privacidad: string;
 }
 
 export interface HomepageData {
@@ -76,8 +81,7 @@ export async function getEventoPortal(slug: string): Promise<EventoPortal> {
 
 export interface PagoFullPassEstado {
   estado: "pendiente" | "aprobado" | "rechazado";
-  nombre_completo: string;
-  cedula: string;
+  nombre_completo?: string;
 }
 
 export async function getFullPassEstado(
@@ -102,16 +106,19 @@ export async function submitFullPass(
 
 // ── Categorías ───────────────────────────────────────────────────────────────
 
+export interface InscripcionExistente {
+  id: number;
+  nombre_acto: string;
+  ritmo: string;
+  modalidad: string;
+  categoria_ritmo_id: number;
+  estado: "pendiente" | "aprobada" | "rechazada";
+}
+
 export interface CategoriasPortalResponse {
   full_pass_estado: "pendiente" | "aprobado" | "rechazado" | null;
   categorias: CategoriaRitmo[];
-  inscripciones_existentes: {
-    id: number;
-    nombre_acto: string;
-    ritmo: string;
-    modalidad: string;
-    estado: string;
-  }[];
+  inscripciones_existentes: InscripcionExistente[];
 }
 
 export async function getCategoriasPortal(
@@ -121,6 +128,33 @@ export async function getCategoriasPortal(
   const { data } = await publicClient.get(`/portal/${slug}/categorias/`, {
     params: { cedula },
   });
+  return data;
+}
+
+export interface RegistroCategoriaPayload {
+  cedula: string;
+  categoria_ritmo: number;
+  nombre_acto?: string;
+  academia?: string;
+  foto_url?: string;
+  pista_musical_url?: string;
+  comprobante_categoria_url?: string;
+  cedula_2?: string;
+  cedulas?: string[];
+  representante?: string;
+  cedula_representante?: string;
+  acepta_politica_privacidad: boolean;
+  es_menor_edad?: boolean;
+  acepta_como_representante_legal?: boolean;
+  nombre_representante_legal?: string;
+  cedula_representante_legal?: string;
+}
+
+export async function submitCategoriaPortal(
+  slug: string,
+  payload: RegistroCategoriaPayload
+): Promise<{ id: number; estado: string }> {
+  const { data } = await publicClient.post(`/portal/${slug}/categorias/`, payload);
   return data;
 }
 
@@ -141,7 +175,7 @@ export interface AgendaItem {
 export async function getMiAgenda(
   slug: string,
   cedula: string
-): Promise<{ cedula: string; items: AgendaItem[] }> {
+): Promise<{ items: AgendaItem[] }> {
   const { data } = await publicClient.get(`/portal/${slug}/mi-agenda/`, {
     params: { cedula },
   });
