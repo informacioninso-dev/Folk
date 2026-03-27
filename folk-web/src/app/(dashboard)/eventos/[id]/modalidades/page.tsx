@@ -16,6 +16,14 @@ const MODALIDAD_LABEL: Record<string, string> = {
   solista: "Solista", pareja: "Pareja", grupo: "Grupo",
 };
 
+const MODALIDAD_COLOR: Record<string, string> = {
+  solista: "bg-purple-100 text-purple-700",
+  pareja:  "bg-blue-100 text-blue-700",
+  grupo:   "bg-emerald-100 text-emerald-700",
+};
+
+const TODAS_MODALIDADES = ["solista", "pareja", "grupo"] as const;
+
 const ESTADO_INS_BADGE: Record<string, string> = {
   pendiente: "bg-yellow-100 text-yellow-800",
   aprobada:  "bg-green-100 text-green-800",
@@ -75,7 +83,7 @@ function ModalRechazoIns({
   );
 }
 
-// ─── Fila de inscripción con validación ───────────────────────────────────────
+// ─── Fila de inscripción ──────────────────────────────────────────────────────
 
 function FilaInscripcion({
   ins,
@@ -141,7 +149,7 @@ function FilaInscripcion({
   );
 }
 
-// ─── Sección de inscripciones por categoría ───────────────────────────────────
+// ─── Inscripciones por categoría ──────────────────────────────────────────────
 
 function SeccionInscripciones({
   categoria,
@@ -159,7 +167,7 @@ function SeccionInscripciones({
     <div className="border border-gray-100 rounded-xl overflow-hidden">
       <div className="px-4 py-2.5 bg-gray-50 flex items-center gap-2">
         <span className="text-sm font-medium text-gray-700">{categoria.nombre_ritmo}</span>
-        <span className="text-xs bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full">
+        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${MODALIDAD_COLOR[categoria.modalidad]}`}>
           {MODALIDAD_LABEL[categoria.modalidad]}
         </span>
         {pendientes > 0 && (
@@ -207,17 +215,42 @@ export default function ModalidadesPage() {
   const crearMutation    = useCrearCategoria();
   const eliminarMutation = useEliminarCategoria();
 
-  const [nombre,    setNombre]    = useState("");
-  const [modalidad, setModalidad] = useState("solista");
-  const [modalIns,  setModalIns]  = useState<{ ins: Inscripcion; catId: number } | null>(null);
+  const [nombre,     setNombre]     = useState("");
+  const [seleccion,  setSeleccion]  = useState<Set<string>>(new Set());
+  const [modalIns,   setModalIns]   = useState<{ ins: Inscripcion; catId: number } | null>(null);
 
-  const handleAgregar = () => {
-    if (!nombre.trim()) return;
-    crearMutation.mutate(
-      { evento: eventoId, nombre_ritmo: nombre.trim(), modalidad },
-      { onSuccess: () => setNombre("") }
-    );
+  const toggleModalidad = (m: string) => {
+    setSeleccion((prev) => {
+      const next = new Set(prev);
+      next.has(m) ? next.delete(m) : next.add(m);
+      return next;
+    });
   };
+
+  const handleAgregar = async () => {
+    if (!nombre.trim() || seleccion.size === 0) return;
+    // Crea una entrada por cada tipo de participación seleccionado
+    for (const modalidad of TODAS_MODALIDADES) {
+      if (!seleccion.has(modalidad)) continue;
+      await new Promise<void>((resolve) =>
+        crearMutation.mutate(
+          { evento: eventoId, nombre_ritmo: nombre.trim(), modalidad },
+          { onSuccess: () => resolve(), onError: () => resolve() } // ignora duplicados
+        )
+      );
+    }
+    setNombre("");
+    setSeleccion(new Set());
+  };
+
+  // Agrupa categorías por nombre de ritmo para mostrarlas juntas
+  const porRitmo = (categorias ?? []).reduce<Record<string, CategoriaRitmo[]>>(
+    (acc, cat) => {
+      (acc[cat.nombre_ritmo] ??= []).push(cat);
+      return acc;
+    },
+    {}
+  );
 
   return (
     <>
@@ -230,69 +263,103 @@ export default function ModalidadesPage() {
       )}
 
       <div className="space-y-6">
-        {/* ─── Gestión de categorías ─────────────────────────────────────── */}
+        {/* ─── Formulario de nuevo ritmo ──────────────────────────────────── */}
         <div className="space-y-4">
           <h2 className="font-semibold text-gray-800">Categorías</h2>
 
-          <div className="bg-white border border-gray-200 rounded-xl p-4 flex items-end gap-3 flex-wrap">
-            <div className="flex-1 min-w-40">
-              <label className="block text-xs text-gray-500 mb-1">Nombre del ritmo / modalidad</label>
-              <input
-                value={nombre}
-                onChange={(e) => setNombre(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleAgregar()}
-                placeholder="Ej: Salsa, Merengue, Folklore…"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 transition"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Tipo</label>
-              <select
-                value={modalidad}
-                onChange={(e) => setModalidad(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white transition"
+          <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
+            <div className="flex items-end gap-3 flex-wrap">
+              <div className="flex-1 min-w-48">
+                <label className="block text-xs text-gray-500 mb-1">Nombre del ritmo</label>
+                <input
+                  value={nombre}
+                  onChange={(e) => setNombre(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleAgregar()}
+                  placeholder="Ej: Salsa, Merengue, Folklore…"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 transition"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Tipos de participación</label>
+                <div className="flex gap-2">
+                  {TODAS_MODALIDADES.map((m) => {
+                    const active = seleccion.has(m);
+                    return (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => toggleModalidad(m)}
+                        className={`px-3 py-2 rounded-lg text-sm font-medium border transition select-none ${
+                          active
+                            ? `${MODALIDAD_COLOR[m]} border-transparent`
+                            : "bg-white text-gray-400 border-gray-300 hover:border-gray-400"
+                        }`}
+                      >
+                        {MODALIDAD_LABEL[m]}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <button
+                onClick={handleAgregar}
+                disabled={crearMutation.isPending || !nombre.trim() || seleccion.size === 0}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white text-sm font-medium rounded-lg transition"
               >
-                <option value="solista">Solista</option>
-                <option value="pareja">Pareja</option>
-                <option value="grupo">Grupo</option>
-              </select>
+                {crearMutation.isPending ? "Guardando…" : "+ Agregar"}
+              </button>
             </div>
-            <button
-              onClick={handleAgregar}
-              disabled={crearMutation.isPending || !nombre.trim()}
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition"
-            >
-              + Agregar
-            </button>
+
+            {seleccion.size === 0 && nombre.trim() && (
+              <p className="text-xs text-amber-600">Selecciona al menos un tipo de participación.</p>
+            )}
           </div>
 
+          {/* ─── Lista agrupada por ritmo ─────────────────────────────────── */}
           {isLoading ? (
             <div className="space-y-2">{[1, 2, 3].map((i) => <div key={i} className="h-12 bg-gray-100 rounded-xl animate-pulse" />)}</div>
-          ) : !categorias?.length ? (
+          ) : Object.keys(porRitmo).length === 0 ? (
             <p className="text-gray-400 text-sm text-center py-8">Aún no hay categorías. Agrega la primera arriba.</p>
           ) : (
-            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-              {categorias.map((cat, idx) => (
-                <div key={cat.id} className={`flex items-center justify-between px-5 py-3 ${idx > 0 ? "border-t border-gray-100" : ""}`}>
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-gray-800">{cat.nombre_ritmo}</span>
-                    <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">
-                      {MODALIDAD_LABEL[cat.modalidad] ?? cat.modalidad}
-                    </span>
+            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden divide-y divide-gray-100">
+              {Object.entries(porRitmo).map(([ritmo, cats]) => (
+                <div key={ritmo} className="flex items-center justify-between px-5 py-3">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-medium text-gray-800">{ritmo}</span>
+                    <div className="flex gap-1.5 flex-wrap">
+                      {cats.map((cat) => (
+                        <span
+                          key={cat.id}
+                          className={`text-xs px-2 py-0.5 rounded-full font-medium ${MODALIDAD_COLOR[cat.modalidad]}`}
+                        >
+                          {MODALIDAD_LABEL[cat.modalidad]}
+                        </span>
+                      ))}
+                    </div>
                   </div>
-                  <button
-                    onClick={() => { if (confirm(`¿Eliminar "${cat.nombre_ritmo}"?`)) eliminarMutation.mutate({ id: cat.id, eventoId }); }}
-                    className="text-xs text-red-400 hover:text-red-600 transition-colors"
-                  >
-                    Eliminar
-                  </button>
+                  <div className="flex gap-2">
+                    {cats.map((cat) => (
+                      <button
+                        key={cat.id}
+                        onClick={() => {
+                          if (confirm(`¿Eliminar "${cat.nombre_ritmo} - ${MODALIDAD_LABEL[cat.modalidad]}"?`))
+                            eliminarMutation.mutate({ id: cat.id, eventoId });
+                        }}
+                        className="text-xs text-red-400 hover:text-red-600 transition-colors"
+                      >
+                        ✕ {MODALIDAD_LABEL[cat.modalidad]}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               ))}
             </div>
           )}
         </div>
 
-        {/* ─── Validación de inscripciones ───────────────────────────────── */}
+        {/* ─── Validación de inscripciones ─────────────────────────────────── */}
         {categorias && categorias.length > 0 && (
           <div className="space-y-3">
             <h2 className="font-semibold text-gray-800">Inscripciones por modalidad</h2>
