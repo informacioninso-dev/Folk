@@ -84,6 +84,9 @@ class Evento(BaseModel):
     pago_folk_confirmado = models.BooleanField(default=False)
     monto_folk           = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
     notas_pago           = models.TextField(blank=True, default="")
+    # Configuración de participación
+    permitir_multimodalidad  = models.BooleanField(default=False)
+    categorias_tienen_costo  = models.BooleanField(default=False)
 
     class Meta:
         ordering = ("-fecha", "nombre")
@@ -121,9 +124,10 @@ class CategoriaRitmo(BaseModel):
     modalidad       = models.CharField(max_length=20, choices=Modalidad.choices)
     edad_min        = models.PositiveSmallIntegerField(null=True, blank=True)
     edad_max        = models.PositiveSmallIntegerField(null=True, blank=True)
-    precio_adicional = models.DecimalField(
+    precio_adicional   = models.DecimalField(
         max_digits=8, decimal_places=2, default=Decimal("0.00")
     )
+    incluido_full_pass = models.BooleanField(default=True)
 
     class Meta:
         ordering = ("nombre_ritmo", "modalidad")

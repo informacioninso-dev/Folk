@@ -51,6 +51,9 @@ export const categoriasApi = {
   create: (data: { evento: number; nombre_ritmo: string; modalidad: string }) =>
     apiClient.post<CategoriaRitmo>("/categorias-ritmo/", data).then((r) => r.data),
 
+  update: (id: number, data: Partial<Pick<CategoriaRitmo, "precio_adicional" | "incluido_full_pass">>) =>
+    apiClient.patch<CategoriaRitmo>(`/categorias-ritmo/${id}/`, data).then((r) => r.data),
+
   delete: (id: number) => apiClient.delete(`/categorias-ritmo/${id}/`),
 
   ranking: (id: number) =>

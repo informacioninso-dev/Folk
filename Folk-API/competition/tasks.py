@@ -9,29 +9,54 @@ from .models import Inscripcion, ParticipanteGeneral, Ranking
 def send_inscripcion_confirmada_email(inscripcion_id: int) -> int:
     inscripcion = Inscripcion.objects.select_related(
         "categoria_ritmo__evento__organizador"
-    ).prefetch_related("participantes").get(pk=inscripcion_id)
+    ).prefetch_related(
+        "participantes",
+        "pareja__participante_1",
+        "pareja__participante_2",
+        "grupo__participantes",
+    ).get(pk=inscripcion_id)
     evento = inscripcion.categoria_ritmo.evento
 
-    subject = f"Inscripcion confirmada #{inscripcion.id}"
+    subject = f"Inscripcion registrada — {evento.nombre}"
     message = (
-        f"Su inscripcion para '{evento.nombre}' ha sido confirmada.\n"
-        f"ID de registro: {inscripcion.id}\n"
-        f"Categoria: {inscripcion.categoria_ritmo.nombre_ritmo} "
+        f"Tu inscripcion para '{evento.nombre}' fue registrada y está pendiente de validación.\n"
+        f"ID de registro: #{inscripcion.id}\n"
+        f"Categoría: {inscripcion.categoria_ritmo.nombre_ritmo} "
         f"({inscripcion.categoria_ritmo.get_modalidad_display()})\n"
-        f"Acto: {inscripcion.nombre_acto}\n"
+        f"Acto: {inscripcion.nombre_acto}\n\n"
+        f"El organizador revisará tu inscripción y recibirás una notificación con el resultado."
     )
 
-    recipients = [evento.organizador.email_contacto]
+    recipients = set()
+    recipients.add(evento.organizador.email_contacto)
 
-    # Agregar emails de participantes si los registraron
-    participant_emails = [p.email for p in inscripcion.participantes.all() if p.email]
-    recipients.extend(participant_emails)
+    # Admin-flow: Participante FK records
+    for p in inscripcion.participantes.all():
+        if p.email:
+            recipients.add(p.email)
+
+    # M2-flow: ParticipanteGeneral via Pareja/Grupo
+    try:
+        pareja = inscripcion.pareja
+        for pg in [pareja.participante_1, pareja.participante_2]:
+            if pg and pg.correo_electronico:
+                recipients.add(pg.correo_electronico)
+    except Exception:
+        pass
+
+    try:
+        for pg in inscripcion.grupo.participantes.all():
+            if pg.correo_electronico:
+                recipients.add(pg.correo_electronico)
+    except Exception:
+        pass
 
     return send_mail(
         subject=subject,
         message=message,
         from_email=settings.DEFAULT_FROM_EMAIL,
-        recipient_list=recipients,
+        recipient_list=list(recipients),
+        fail_silently=True,
     )
 
 

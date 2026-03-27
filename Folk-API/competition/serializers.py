@@ -131,6 +131,8 @@ class EventoSerializer(serializers.ModelSerializer):
             "pago_folk_confirmado",
             "monto_folk",
             "notas_pago",
+            "permitir_multimodalidad",
+            "categorias_tienen_costo",
             "created_at",
             "updated_at",
         )
@@ -151,6 +153,7 @@ class CategoriaRitmoSerializer(serializers.ModelSerializer):
             "edad_min",
             "edad_max",
             "precio_adicional",
+            "incluido_full_pass",
             "created_at",
             "updated_at",
         )
@@ -597,6 +600,10 @@ class InscripcionModalidadSerializer(serializers.Serializer):
                     academia             = validated_data.get("academia", ""),
                 )
                 grupo.participantes.set(validated_data["_pgs"])
+
+            transaction.on_commit(
+                lambda: send_inscripcion_confirmada_email.delay(inscripcion.id)
+            )
 
         return inscripcion
 

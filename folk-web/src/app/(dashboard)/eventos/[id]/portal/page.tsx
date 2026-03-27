@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { apiClient } from "@/lib/api-client";
 import { fullPassConfigApi, estadisticasApi, type EventoEstadisticas } from "@/features/eventos/api";
-import type { FullPassConfig } from "@/features/eventos/types";
+import { useCategorias, useActualizarCategoria } from "@/features/eventos/hooks";
+import type { FullPassConfig, CategoriaRitmo } from "@/features/eventos/types";
 
 export default function PortalConfigPage() {
   const { id } = useParams<{ id: string }>();
@@ -25,6 +26,17 @@ export default function PortalConfigPage() {
   const [guardandoFp, setGuardandoFp] = useState(false);
   const [fpOk, setFpOk] = useState(false);
 
+  // Config participación
+  const [permitirMulti, setPermitirMulti]     = useState(false);
+  const [categoriasCosto, setCategoriasCosto] = useState(false);
+  const [guardandoConfig, setGuardandoConfig] = useState(false);
+  const [configOk, setConfigOk]               = useState(false);
+
+  // Precios por categoría
+  const { data: categorias } = useCategorias(eventoId);
+  const actualizarCat        = useActualizarCategoria(eventoId);
+  const [preciosForm, setPreciosForm] = useState<Record<number, { precio: string; incluido: boolean }>>({});
+
   // Estadísticas
   const [stats, setStats] = useState<EventoEstadisticas | null>(null);
 
@@ -35,6 +47,8 @@ export default function PortalConfigPage() {
       setDescripcion(ev.descripcion_portal ?? "");
       setDestacado(ev.destacado ?? false);
       if (ev.banner_url) setBannerPreview(ev.banner_url);
+      setPermitirMulti(ev.permitir_multimodalidad ?? false);
+      setCategoriasCosto(ev.categorias_tienen_costo ?? false);
     });
 
     // Cargar Full Pass Config
@@ -48,6 +62,23 @@ export default function PortalConfigPage() {
     // Estadísticas
     estadisticasApi.get(eventoId).then(setStats).catch(() => null);
   }, [eventoId]);
+
+  // Inicializar form de precios cuando lleguen las categorías
+  useEffect(() => {
+    if (!categorias) return;
+    setPreciosForm((prev) => {
+      const next = { ...prev };
+      for (const cat of categorias) {
+        if (!(cat.id in next)) {
+          next[cat.id] = {
+            precio: cat.precio_adicional,
+            incluido: cat.incluido_full_pass,
+          };
+        }
+      }
+      return next;
+    });
+  }, [categorias]);
 
   async function guardarPortal() {
     setGuardandoPortal(true);
@@ -90,6 +121,32 @@ export default function PortalConfigPage() {
     } finally {
       setGuardandoFp(false);
     }
+  }
+
+  async function guardarConfig() {
+    setGuardandoConfig(true);
+    setConfigOk(false);
+    try {
+      await apiClient.patch(`/eventos/${eventoId}/`, {
+        permitir_multimodalidad: permitirMulti,
+        categorias_tienen_costo: categoriasCosto,
+      });
+      setConfigOk(true);
+    } finally {
+      setGuardandoConfig(false);
+    }
+  }
+
+  async function guardarPrecioCategoria(cat: CategoriaRitmo) {
+    const form = preciosForm[cat.id];
+    if (!form) return;
+    await actualizarCat.mutateAsync({
+      id: cat.id,
+      data: {
+        precio_adicional: form.incluido ? "0.00" : form.precio,
+        incluido_full_pass: form.incluido,
+      },
+    });
   }
 
   return (
@@ -234,6 +291,108 @@ export default function PortalConfigPage() {
           {fpOk && <span className="text-green-600 text-sm">✓ Guardado</span>}
         </div>
       </section>
+
+      {/* ── Configuración de participación ───────────────────────────────── */}
+      <section className="bg-white border border-gray-200 rounded-2xl p-6 space-y-5">
+        <h3 className="font-semibold text-gray-800">Configuración de participación</h3>
+
+        <label className="flex items-start gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={permitirMulti}
+            onChange={(e) => setPermitirMulti(e.target.checked)}
+            className="w-4 h-4 mt-0.5 accent-indigo-600"
+          />
+          <div>
+            <span className="text-sm font-medium text-gray-700">Permitir mismo ritmo en múltiples modalidades</span>
+            <p className="text-xs text-gray-400 mt-0.5">
+              Un participante puede inscribirse en Salsa Solista y también en Salsa Pareja en el mismo evento.
+            </p>
+          </div>
+        </label>
+
+        <label className="flex items-start gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={categoriasCosto}
+            onChange={(e) => setCategoriasCosto(e.target.checked)}
+            className="w-4 h-4 mt-0.5 accent-indigo-600"
+          />
+          <div>
+            <span className="text-sm font-medium text-gray-700">Las categorías tienen costo adicional al Full Pass</span>
+            <p className="text-xs text-gray-400 mt-0.5">
+              Activa esto para configurar un precio por categoría o marcarlas como incluidas en el Full Pass.
+            </p>
+          </div>
+        </label>
+
+        <div className="flex items-center gap-3">
+          <button
+            onClick={guardarConfig}
+            disabled={guardandoConfig}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-xl font-semibold transition disabled:opacity-50"
+          >
+            {guardandoConfig ? "Guardando..." : "Guardar"}
+          </button>
+          {configOk && <span className="text-green-600 text-sm">✓ Guardado</span>}
+        </div>
+      </section>
+
+      {/* ── Precios por categoría ─────────────────────────────────────────── */}
+      {categoriasCosto && categorias && categorias.length > 0 && (
+        <section className="bg-white border border-gray-200 rounded-2xl p-6 space-y-4">
+          <h3 className="font-semibold text-gray-800">Precio por categoría</h3>
+          <p className="text-sm text-gray-500">
+            Configura el precio adicional de cada categoría o márcala como incluida en el Full Pass
+            (sin costo extra y sin requerir comprobante).
+          </p>
+          <div className="divide-y divide-gray-100">
+            {categorias.map((cat) => {
+              const form = preciosForm[cat.id] ?? { precio: cat.precio_adicional, incluido: cat.incluido_full_pass };
+              const MODAL_LABEL: Record<string, string> = { solista: "Solista", pareja: "Pareja", grupo: "Grupo" };
+              return (
+                <div key={cat.id} className="py-3 flex items-center gap-4 flex-wrap">
+                  <div className="flex-1 min-w-0">
+                    <span className="font-medium text-gray-800 text-sm">{cat.nombre_ritmo}</span>
+                    <span className="ml-2 text-xs text-gray-400">{MODAL_LABEL[cat.modalidad]}</span>
+                  </div>
+                  <label className="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer shrink-0">
+                    <input
+                      type="checkbox"
+                      checked={form.incluido}
+                      onChange={(e) =>
+                        setPreciosForm((p) => ({ ...p, [cat.id]: { ...form, incluido: e.target.checked } }))
+                      }
+                      className="w-4 h-4 accent-indigo-600"
+                    />
+                    Incluido en FP
+                  </label>
+                  {!form.incluido && (
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={form.precio}
+                      onChange={(e) =>
+                        setPreciosForm((p) => ({ ...p, [cat.id]: { ...form, precio: e.target.value } }))
+                      }
+                      placeholder="0.00"
+                      className="w-28 border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-indigo-500"
+                    />
+                  )}
+                  <button
+                    onClick={() => guardarPrecioCategoria(cat)}
+                    disabled={actualizarCat.isPending}
+                    className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-medium rounded-lg transition disabled:opacity-50"
+                  >
+                    Guardar
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       {/* ── Estadísticas por categoría ────────────────────────────────────── */}
       {stats && stats.categorias.length > 0 && (

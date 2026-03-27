@@ -13,6 +13,8 @@ interface CategoriaPublica {
   id: number;
   nombre_ritmo: string;
   modalidad: "solista" | "pareja" | "grupo";
+  precio_adicional: string;
+  incluido_full_pass: boolean;
 }
 
 interface EventoPublico {
@@ -442,7 +444,19 @@ export default function InscribirseModalidadPage() {
             <p className="text-sm font-medium text-gray-700">Archivos</p>
             <FileUpload label="Foto del acto" optional onUrl={setFotoUrl} />
             <FileUpload label="Pista musical" optional onUrl={setPistaUrl} />
-            <FileUpload label="Comprobante de categoría" optional onUrl={setComprobanteUrl} />
+            {categoria && !categoria.incluido_full_pass && (
+              <div>
+                <FileUpload
+                  label={`Comprobante de pago de categoría${categoria.precio_adicional && Number(categoria.precio_adicional) > 0 ? ` ($${categoria.precio_adicional})` : ""}`}
+                  onUrl={setComprobanteUrl}
+                />
+              </div>
+            )}
+            {categoria && categoria.incluido_full_pass && (
+              <div className="bg-green-50 border border-green-100 rounded-xl px-4 py-2.5 text-sm text-green-700">
+                Esta categoría está incluida en el Full Pass — no requiere comprobante adicional.
+              </div>
+            )}
           </div>
         )}
 

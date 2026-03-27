@@ -113,6 +113,15 @@ export function useEliminarCategoria() {
   });
 }
 
+export function useActualizarCategoria(eventoId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: Parameters<typeof categoriasApi.update>[1] }) =>
+      categoriasApi.update(id, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: categoriaKeys.list(eventoId) }),
+  });
+}
+
 export function useCategoriaRanking(id: number) {
   return useQuery({
     queryKey: categoriaKeys.ranking(id),

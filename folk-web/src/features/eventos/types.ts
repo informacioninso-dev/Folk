@@ -21,6 +21,8 @@ export interface Evento {
   pago_folk_confirmado: boolean;
   monto_folk: string | null;
   notas_pago: string;
+  permitir_multimodalidad: boolean;
+  categorias_tienen_costo: boolean;
   created_at: string;
 }
 
@@ -82,6 +84,7 @@ export interface CategoriaRitmo {
   edad_min: number | null;
   edad_max: number | null;
   precio_adicional: string;
+  incluido_full_pass: boolean;
 }
 
 export interface Participante {
