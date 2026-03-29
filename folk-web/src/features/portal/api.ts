@@ -50,6 +50,7 @@ export interface EventoPortal {
   politica_privacidad_url: string;
   aviso_privacidad_corto: string;
   contacto_privacidad: string;
+  whatsapp_contacto: { numero: string; mensaje: string } | null;
 }
 
 export interface HomepageData {

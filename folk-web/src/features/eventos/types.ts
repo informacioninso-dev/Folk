@@ -23,6 +23,8 @@ export interface Evento {
   notas_pago: string;
   permitir_multimodalidad: boolean;
   categorias_tienen_costo: boolean;
+  mostrar_whatsapp: boolean;
+  whatsapp_mensaje_evento: string;
   created_at: string;
 }
 
@@ -120,6 +122,19 @@ export interface ParticipanteGeneral {
   comprobante_pago_url: string;
   estado: "pendiente_validacion" | "activo" | "rechazado";
   nota_rechazo: string;
+}
+
+export interface ParticipanteUnificado {
+  id: number;
+  origen: "full_pass" | "registro_general";
+  nombre_completo: string;
+  cedula: string;
+  correo_electronico: string;
+  telefono: string;
+  estado: string;
+  comprobante_url: string;
+  categorias: { id: number; nombre: string; estado: string }[];
+  created_at: string;
 }
 
 export interface RankingInscripcion {

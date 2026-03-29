@@ -8,7 +8,7 @@ const NAV_ITEMS = [
   { slug: "portal",        label: "Portal"         },
   { slug: "pagos",         label: "Pagos"          },
   { slug: "participantes", label: "Participantes"  },
-  { slug: "modalidades",   label: "Modalidades"    },
+  { slug: "modalidades",   label: "Categorías"     },
   { slug: "jueces",        label: "Jueces"         },
   { slug: "criterios",     label: "Criterios"      },
   { slug: "ranking",       label: "Ranking"        },

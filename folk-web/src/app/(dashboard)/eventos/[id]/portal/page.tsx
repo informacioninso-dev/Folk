@@ -14,6 +14,9 @@ export default function PortalConfigPage() {
   // Portal fields
   const [descripcion, setDescripcion] = useState("");
   const [destacado, setDestacado] = useState(false);
+  const [mostrarWhatsapp, setMostrarWhatsapp] = useState(false);
+  const [whatsappMensajeEvento, setWhatsappMensajeEvento] = useState("");
+  const [orgWhatsappNumero, setOrgWhatsappNumero] = useState("");
   const [bannerFile, setBannerFile] = useState<File | null>(null);
   const [bannerPreview, setBannerPreview] = useState<string | null>(null);
   const [guardandoPortal, setGuardandoPortal] = useState(false);
@@ -49,7 +52,14 @@ export default function PortalConfigPage() {
       if (ev.banner_url) setBannerPreview(ev.banner_url);
       setPermitirMulti(ev.permitir_multimodalidad ?? false);
       setCategoriasCosto(ev.categorias_tienen_costo ?? false);
+      setMostrarWhatsapp(ev.mostrar_whatsapp ?? false);
+      setWhatsappMensajeEvento(ev.whatsapp_mensaje_evento ?? "");
     });
+
+    // Cargar número de WhatsApp del organizador
+    apiClient.get("/organizadores/mi-empresa/").then((r) => {
+      setOrgWhatsappNumero(r.data.whatsapp_numero ?? "");
+    }).catch(() => null);
 
     // Cargar Full Pass Config
     fullPassConfigApi.get(eventoId).then((fp) => {
@@ -87,6 +97,8 @@ export default function PortalConfigPage() {
       const fd = new FormData();
       fd.append("descripcion_portal", descripcion);
       fd.append("destacado", String(destacado));
+      fd.append("mostrar_whatsapp", String(mostrarWhatsapp));
+      fd.append("whatsapp_mensaje_evento", whatsappMensajeEvento);
       if (bannerFile) fd.append("banner", bannerFile);
       await apiClient.patch(`/eventos/${eventoId}/`, fd, {
         headers: { "Content-Type": "multipart/form-data" },
@@ -227,6 +239,54 @@ export default function PortalConfigPage() {
             Mostrar en el slider de eventos destacados de la homepage
           </span>
         </label>
+
+        {/* WhatsApp */}
+        <div className="border-t border-gray-100 pt-4 space-y-3">
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={mostrarWhatsapp}
+              onChange={(e) => setMostrarWhatsapp(e.target.checked)}
+              className="w-4 h-4 mt-0.5 accent-green-600"
+            />
+            <div>
+              <span className="text-sm font-medium text-gray-700">Mostrar botón de contacto WhatsApp en el portal</span>
+              <p className="text-xs text-gray-400 mt-0.5">
+                Aparece un botón flotante al final del portal para que los participantes te escriban directamente.
+              </p>
+            </div>
+          </label>
+
+          {mostrarWhatsapp && !orgWhatsappNumero && (
+            <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+              <span className="text-amber-500 text-lg leading-none shrink-0">⚠</span>
+              <p className="text-sm text-amber-700">
+                No tienes un número de WhatsApp configurado. Ve a{" "}
+                <a href="/mi-empresa" className="font-semibold underline hover:text-amber-900">Mi empresa</a>{" "}
+                para agregarlo antes de activar esta opción.
+              </p>
+            </div>
+          )}
+
+          {mostrarWhatsapp && orgWhatsappNumero && (
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Mensaje personalizado para este evento
+                <span className="text-gray-400 font-normal ml-1">(opcional)</span>
+              </label>
+              <input
+                type="text"
+                value={whatsappMensajeEvento}
+                onChange={(e) => setWhatsappMensajeEvento(e.target.value)}
+                placeholder={`Hola, tengo una consulta sobre el evento…`}
+                className={inputCls}
+              />
+              <p className="text-xs text-gray-400">
+                Si lo dejas vacío se usará el mensaje predeterminado de tu empresa.
+              </p>
+            </div>
+          )}
+        </div>
 
         <div className="flex items-center gap-3">
           <button

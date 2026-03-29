@@ -540,6 +540,111 @@ class EventoViewSet(viewsets.ModelViewSet):
             "notas_pago": evento.notas_pago,
         })
 
+    @action(detail=True, methods=["get"], url_path="participantes-todos")
+    def participantes_todos(self, request, pk=None):
+        """Lista unificada de todos los participantes del evento:
+        - Los de Full Pass (PagoFullPass)
+        - Los de Registro General (ParticipanteGeneral)
+        Cada entrada incluye las categorías en las que está inscrito.
+        """
+        evento = self.get_object()
+
+        resultado = []
+
+        # ── Full Pass ────────────────────────────────────────────────────────
+        pagos = (
+            PagoFullPass.objects
+            .filter(evento=evento)
+            .prefetch_related("pagos_categoria__inscripcion__categoria_ritmo")
+            .order_by("-created_at")
+        )
+        for pago in pagos:
+            categorias = []
+            for pc in pago.pagos_categoria.all():
+                if pc.inscripcion and pc.inscripcion.categoria_ritmo:
+                    cat = pc.inscripcion.categoria_ritmo
+                    categorias.append({
+                        "id": pc.inscripcion.id,
+                        "nombre": f"{cat.nombre_ritmo} — {cat.get_modalidad_display()}",
+                        "estado": pc.inscripcion.estado_inscripcion,
+                    })
+            resultado.append({
+                "id": pago.id,
+                "origen": "full_pass",
+                "nombre_completo": pago.nombre_completo,
+                "cedula": pago.cedula,
+                "correo_electronico": pago.correo_electronico,
+                "telefono": pago.telefono,
+                "estado": pago.estado,
+                "comprobante_url": pago.comprobante_imagen.url if pago.comprobante_imagen else "",
+                "categorias": categorias,
+                "created_at": pago.created_at,
+            })
+
+        # ── Registro General ─────────────────────────────────────────────────
+        generales = (
+            ParticipanteGeneral.objects
+            .filter(evento=evento)
+            .prefetch_related(
+                "inscripciones_solista__categoria_ritmo",
+                "parejas_como_1__inscripcion__categoria_ritmo",
+                "parejas_como_2__inscripcion__categoria_ritmo",
+                "grupos__inscripcion__categoria_ritmo",
+            )
+            .order_by("-created_at")
+        )
+        for pg in generales:
+            seen_ins_ids = set()
+            categorias = []
+
+            for ins in pg.inscripciones_solista.all():
+                if ins.categoria_ritmo and ins.id not in seen_ins_ids:
+                    seen_ins_ids.add(ins.id)
+                    cat = ins.categoria_ritmo
+                    categorias.append({
+                        "id": ins.id,
+                        "nombre": f"{cat.nombre_ritmo} — {cat.get_modalidad_display()}",
+                        "estado": ins.estado_inscripcion,
+                    })
+            for pareja in list(pg.parejas_como_1.all()) + list(pg.parejas_como_2.all()):
+                try:
+                    ins = pareja.inscripcion
+                except Exception:
+                    continue
+                if ins and ins.categoria_ritmo and ins.id not in seen_ins_ids:
+                    seen_ins_ids.add(ins.id)
+                    cat = ins.categoria_ritmo
+                    categorias.append({"id": ins.id, "nombre": f"{cat.nombre_ritmo} — {cat.get_modalidad_display()}", "estado": ins.estado_inscripcion})
+            for grupo in pg.grupos.all():
+                try:
+                    ins = grupo.inscripcion
+                except Exception:
+                    continue
+                if ins and ins.categoria_ritmo and ins.id not in seen_ins_ids:
+                    seen_ins_ids.add(ins.id)
+                    cat = ins.categoria_ritmo
+                    categorias.append({"id": ins.id, "nombre": f"{cat.nombre_ritmo} — {cat.get_modalidad_display()}", "estado": ins.estado_inscripcion})
+            resultado.append({
+                "id": pg.id,
+                "origen": "registro_general",
+                "nombre_completo": pg.nombre_completo,
+                "cedula": pg.cedula,
+                "correo_electronico": pg.correo_electronico,
+                "telefono": pg.telefono,
+                "estado": pg.estado,
+                "comprobante_url": pg.comprobante_pago_url,
+                "categorias": categorias,
+                "created_at": pg.created_at,
+            })
+
+        # Ordenar por fecha desc
+        resultado.sort(key=lambda x: x["created_at"], reverse=True)
+        # Serializar datetimes
+        for r in resultado:
+            r["created_at"] = r["created_at"].isoformat()
+
+        return Response(resultado)
+
     @action(detail=True, methods=["post"], url_path="get-or-create-ranking")
     def get_or_create_ranking(self, request, pk=None):
         evento = self.get_object()

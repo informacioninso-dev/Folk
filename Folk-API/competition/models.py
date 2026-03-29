@@ -36,6 +36,11 @@ class Organizador(BaseModel):
     descripcion    = models.TextField(blank=True)
     sitio_web      = models.URLField(blank=True)
     telefono       = models.CharField(max_length=30, blank=True)
+    # WhatsApp de contacto del organizador
+    whatsapp_numero  = models.CharField(max_length=30, blank=True, default="",
+                                        help_text="Número en formato internacional, ej: 593999999999")
+    whatsapp_mensaje = models.CharField(max_length=300, blank=True, default="",
+                                        help_text="Mensaje predeterminado al abrir el chat")
     # Límite de eventos (Fase 1: cobro por evento)
     max_eventos    = models.PositiveIntegerField(default=1)
     # Equipo: usuarios adicionales con acceso al panel
@@ -87,6 +92,11 @@ class Evento(BaseModel):
     # Configuración de participación
     permitir_multimodalidad  = models.BooleanField(default=False)
     categorias_tienen_costo  = models.BooleanField(default=False)
+    # Botón de contacto WhatsApp en portal público
+    mostrar_whatsapp         = models.BooleanField(default=False,
+                                                   help_text="Mostrar botón de WhatsApp del organizador en el portal del evento")
+    whatsapp_mensaje_evento  = models.CharField(max_length=300, blank=True, default="",
+                                                help_text="Mensaje personalizado para este evento (opcional)")
 
     class Meta:
         ordering = ("-fecha", "nombre")

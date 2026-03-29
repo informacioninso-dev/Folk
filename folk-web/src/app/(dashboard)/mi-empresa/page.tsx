@@ -16,6 +16,8 @@ interface EmpresaForm {
   direccion: string;
   sitio_web: string;
   descripcion: string;
+  whatsapp_numero: string;
+  whatsapp_mensaje: string;
 }
 
 // ─── API ──────────────────────────────────────────────────────────────────────
@@ -27,6 +29,8 @@ const getMiEmpresa = () =>
     descripcion: string;
     sitio_web: string;
     telefono: string;
+    whatsapp_numero: string;
+    whatsapp_mensaje: string;
   }>("/organizadores/mi-empresa/").then((r) => r.data);
 
 const updateMiEmpresa = (data: Partial<EmpresaForm>) =>
@@ -58,12 +62,14 @@ export default function MiEmpresaPage() {
   useEffect(() => {
     if (empresa) {
       reset({
-        nombre:         empresa.nombre         ?? "",
-        email_contacto: empresa.email_contacto ?? "",
-        telefono:       empresa.telefono        ?? "",
-        direccion:      empresa.direccion       ?? "",
-        sitio_web:      empresa.sitio_web       ?? "",
-        descripcion:    empresa.descripcion     ?? "",
+        nombre:           empresa.nombre           ?? "",
+        email_contacto:   empresa.email_contacto   ?? "",
+        telefono:         empresa.telefono          ?? "",
+        direccion:        empresa.direccion         ?? "",
+        sitio_web:        empresa.sitio_web         ?? "",
+        descripcion:      empresa.descripcion       ?? "",
+        whatsapp_numero:  empresa.whatsapp_numero   ?? "",
+        whatsapp_mensaje: empresa.whatsapp_mensaje  ?? "",
       });
     }
   }, [empresa, reset]);
@@ -211,6 +217,55 @@ export default function MiEmpresaPage() {
           {saved && (
             <span className="text-sm text-green-600 font-medium">✓ Guardado</span>
           )}
+        </div>
+      </form>
+
+      {/* WhatsApp de contacto */}
+      <form onSubmit={handleSubmit(onSubmit)} className="bg-white rounded-2xl border border-gray-200 p-6 space-y-4">
+        <div>
+          <h2 className="text-sm font-semibold text-gray-700">Contacto WhatsApp</h2>
+          <p className="text-xs text-gray-400 mt-0.5">
+            Configura aquí tu número de WhatsApp. Podrás activar el botón de contacto en cada evento desde la pestaña Portal.
+          </p>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Número de WhatsApp
+            <span className="text-gray-400 font-normal ml-1">(formato internacional, ej: 593999999999)</span>
+          </label>
+          <input
+            {...register("whatsapp_numero")}
+            placeholder="593999999999"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 transition"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Mensaje predeterminado
+            <span className="text-gray-400 font-normal ml-1">(opcional)</span>
+          </label>
+          <textarea
+            {...register("whatsapp_mensaje")}
+            rows={2}
+            placeholder="Hola, tengo una consulta sobre el evento…"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 transition resize-none"
+          />
+          <p className="text-xs text-gray-400 mt-1">
+            Si lo dejas vacío, se usará un mensaje genérico con el nombre del evento.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3 pt-1">
+          <button
+            type="submit"
+            disabled={saveMutation.isPending || !isDirty}
+            className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm font-semibold rounded-lg transition"
+          >
+            {saveMutation.isPending ? "Guardando…" : "Guardar cambios"}
+          </button>
+          {saved && <span className="text-sm text-green-600 font-medium">✓ Guardado</span>}
         </div>
       </form>
     </div>

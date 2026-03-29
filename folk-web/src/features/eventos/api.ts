@@ -9,6 +9,7 @@ import type {
   PagoCategoria,
   PagoFullPass,
   ParticipanteGeneral,
+  ParticipanteUnificado,
   RankingCategoria,
 } from "./types";
 
@@ -137,6 +138,13 @@ export const participantesGeneralesApi = {
   rechazar: (id: number, nota: string) =>
     apiClient
       .post<ParticipanteGeneral>(`/participantes-generales/${id}/rechazar/`, { nota })
+      .then((r) => r.data),
+};
+
+export const participantesTodosApi = {
+  list: (eventoId: number) =>
+    apiClient
+      .get<ParticipanteUnificado[]>(`/eventos/${eventoId}/participantes-todos/`)
       .then((r) => r.data),
 };
 

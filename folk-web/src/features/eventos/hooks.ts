@@ -8,6 +8,7 @@ import {
   juecesApi,
   criteriosGestionApi,
   participantesGeneralesApi,
+  participantesTodosApi,
   inscripcionesValidacionApi,
   rankingGestionApi,
   cronogramaApi,
@@ -205,6 +206,16 @@ export function useBuscarUsuario(username: string) {
     queryFn: () => juecesApi.buscarUsuario(username),
     enabled: username.length >= 2,
     staleTime: 10_000,
+  });
+}
+
+// ─── Participantes unificados ─────────────────────────────────────────────────
+
+export function useParticipantesTodos(eventoId: number) {
+  return useQuery({
+    queryKey: ["participantes-todos", eventoId] as const,
+    queryFn: () => participantesTodosApi.list(eventoId),
+    enabled: !!eventoId,
   });
 }
 

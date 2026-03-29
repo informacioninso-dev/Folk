@@ -115,6 +115,8 @@ class OrganizadorSerializer(serializers.ModelSerializer):
             "descripcion",
             "sitio_web",
             "telefono",
+            "whatsapp_numero",
+            "whatsapp_mensaje",
             "max_eventos",
             "created_at",
             "updated_at",
@@ -189,6 +191,8 @@ class EventoSerializer(serializers.ModelSerializer):
             "notas_pago",
             "permitir_multimodalidad",
             "categorias_tienen_costo",
+            "mostrar_whatsapp",
+            "whatsapp_mensaje_evento",
             "created_at",
             "updated_at",
         )
@@ -485,6 +489,7 @@ class EventoPortalSerializer(serializers.ModelSerializer):
     politica_privacidad_url = serializers.SerializerMethodField()
     aviso_privacidad_corto = serializers.SerializerMethodField()
     contacto_privacidad = serializers.SerializerMethodField()
+    whatsapp_contacto = serializers.SerializerMethodField()
 
     def get_banner_url(self, obj):
         if not obj.banner:
@@ -524,6 +529,21 @@ class EventoPortalSerializer(serializers.ModelSerializer):
     def get_contacto_privacidad(self, obj):
         return get_event_privacy_config(obj)["contact_email"]
 
+    def get_whatsapp_contacto(self, obj):
+        """Devuelve los datos de WhatsApp si el evento tiene activado mostrar_whatsapp
+        y el organizador tiene número configurado."""
+        if not obj.mostrar_whatsapp:
+            return None
+        numero = obj.organizador.whatsapp_numero
+        if not numero:
+            return None
+        mensaje = (
+            obj.whatsapp_mensaje_evento
+            or obj.organizador.whatsapp_mensaje
+            or f"Hola, tengo una consulta sobre el evento {obj.nombre}"
+        )
+        return {"numero": numero, "mensaje": mensaje}
+
     class Meta:
         model = Evento
         fields = (
@@ -532,6 +552,7 @@ class EventoPortalSerializer(serializers.ModelSerializer):
             "full_pass", "categorias", "ranking_revelado",
             "version_politica_privacidad", "politica_privacidad_url",
             "aviso_privacidad_corto", "contacto_privacidad",
+            "whatsapp_contacto",
         )
 
 
