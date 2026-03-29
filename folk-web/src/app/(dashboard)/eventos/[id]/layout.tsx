@@ -73,14 +73,14 @@ export default function EventoLayout({ children }: { children: React.ReactNode }
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             {/* Toggle activo */}
             <button
               onClick={() =>
                 actualizarMutation.mutate({ id, data: { activo: !evento.activo } })
               }
               disabled={actualizarMutation.isPending}
-              className={`text-sm px-3 py-1.5 rounded-lg font-medium transition ${
+              className={`text-sm px-3 py-2 rounded-lg font-medium transition ${
                 evento.activo
                   ? "bg-green-100 text-green-700 hover:bg-green-200"
                   : "bg-gray-100 text-gray-500 hover:bg-gray-200"
@@ -95,7 +95,7 @@ export default function EventoLayout({ children }: { children: React.ReactNode }
                 actualizarMutation.mutate({ id, data: { portal_activo: !evento.portal_activo } })
               }
               disabled={actualizarMutation.isPending}
-              className={`inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg font-medium transition ${
+              className={`inline-flex items-center gap-1.5 text-sm px-3 py-2 rounded-lg font-medium transition ${
                 evento.portal_activo && evento.pago_folk_confirmado
                   ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
                   : evento.portal_activo && !evento.pago_folk_confirmado
@@ -125,7 +125,7 @@ export default function EventoLayout({ children }: { children: React.ReactNode }
               <Link
                 href={`/evento/${evento.slug}`}
                 target="_blank"
-                className="text-sm px-3 py-1.5 rounded-lg font-medium bg-orange-50 text-orange-700 hover:bg-orange-100 transition"
+                className="text-sm px-3 py-2 rounded-lg font-medium bg-orange-50 text-orange-700 hover:bg-orange-100 transition"
               >
                 Ver portal →
               </Link>
@@ -135,7 +135,7 @@ export default function EventoLayout({ children }: { children: React.ReactNode }
             <Link
               href={`/ranking/${evento.slug}`}
               target="_blank"
-              className="text-sm px-3 py-1.5 rounded-lg font-medium bg-gray-50 text-gray-600 hover:bg-gray-100 transition"
+              className="text-sm px-3 py-2 rounded-lg font-medium bg-gray-50 text-gray-600 hover:bg-gray-100 transition"
             >
               Ver ranking →
             </Link>
@@ -167,7 +167,7 @@ export default function EventoLayout({ children }: { children: React.ReactNode }
         )}
 
         {/* ── Nav tabs ──────────────────────────────────────────────────────── */}
-        <nav className="flex gap-0 border-b border-gray-200 overflow-x-auto">
+        <nav className="flex gap-0 border-b border-gray-200 overflow-x-auto scrollbar-none -mx-4 px-4 sm:mx-0 sm:px-0">
           {NAV_ITEMS.map(({ slug, label }) => {
             const href     = `${base}/${slug}`;
             const isActive =
@@ -176,7 +176,7 @@ export default function EventoLayout({ children }: { children: React.ReactNode }
               <Link
                 key={slug}
                 href={href}
-                className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
+                className={`px-3 sm:px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
                   isActive
                     ? "border-indigo-600 text-indigo-700"
                     : "border-transparent text-gray-500 hover:text-gray-700"

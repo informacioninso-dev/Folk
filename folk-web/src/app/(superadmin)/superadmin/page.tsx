@@ -291,7 +291,8 @@ function TabClientes() {
 
       {organizadores && organizadores.length > 0 && (
         <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[640px]">
             <thead className="bg-gray-800">
               <tr>
                 <th className="text-left px-4 py-3 text-gray-400 font-medium">Empresa</th>
@@ -314,6 +315,7 @@ function TabClientes() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 
@@ -337,34 +339,66 @@ function TabClientes() {
 function TabConfiguracion() {
   const { data: config, isLoading } = useSiteConfig();
   const updateMutation = useUpdateSiteConfig();
+
   const [numero, setNumero] = useState("");
   const [mensaje, setMensaje] = useState("");
+  const [ppVersion, setPpVersion] = useState("");
+  const [ppUrl, setPpUrl] = useState("");
+  const [avisoCorto, setAvisoCorto] = useState("");
+  const [emailHost, setEmailHost] = useState("");
+  const [emailPort, setEmailPort] = useState("587");
+  const [emailUseTls, setEmailUseTls] = useState(true);
+  const [emailUser, setEmailUser] = useState("");
+  const [emailPassword, setEmailPassword] = useState("");
+  const [emailFrom, setEmailFrom] = useState("");
   const [saved, setSaved] = useState(false);
 
-  // Sync local state when data loads
   const [initialised, setInitialised] = useState(false);
   if (config && !initialised) {
     setNumero(config.whatsapp_numero);
     setMensaje(config.whatsapp_mensaje);
+    setPpVersion(config.politica_privacidad_version);
+    setPpUrl(config.politica_privacidad_url);
+    setAvisoCorto(config.aviso_privacidad_corto);
+    setEmailHost(config.email_host);
+    setEmailPort(String(config.email_port));
+    setEmailUseTls(config.email_use_tls);
+    setEmailUser(config.email_host_user);
+    setEmailFrom(config.email_from);
     setInitialised(true);
   }
 
   const handleSave = () => {
-    updateMutation.mutate(
-      { whatsapp_numero: numero, whatsapp_mensaje: mensaje },
-      {
-        onSuccess: () => {
-          setSaved(true);
-          setTimeout(() => setSaved(false), 2500);
-        },
-      }
-    );
+    const payload: Parameters<typeof updateMutation.mutate>[0] = {
+      whatsapp_numero: numero,
+      whatsapp_mensaje: mensaje,
+      politica_privacidad_version: ppVersion,
+      politica_privacidad_url: ppUrl,
+      aviso_privacidad_corto: avisoCorto,
+      email_host: emailHost,
+      email_port: Number(emailPort) || 587,
+      email_use_tls: emailUseTls,
+      email_host_user: emailUser,
+      email_from: emailFrom,
+      ...(emailPassword ? { email_host_password: emailPassword } : {}),
+    };
+
+    updateMutation.mutate(payload, {
+      onSuccess: () => {
+        setSaved(true);
+        setEmailPassword("");
+        setTimeout(() => setSaved(false), 2500);
+      },
+    });
   };
+
+  const inputCls =
+    "w-full px-3 py-3 sm:py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition";
 
   if (isLoading) {
     return (
       <div className="space-y-4">
-        {[1, 2].map((i) => (
+        {[1, 2, 3].map((i) => (
           <div key={i} className="h-16 bg-gray-800 rounded-xl animate-pulse" />
         ))}
       </div>
@@ -372,8 +406,10 @@ function TabConfiguracion() {
   }
 
   return (
-    <div className="max-w-lg space-y-6">
-      <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 space-y-5">
+    <div className="w-full max-w-lg space-y-6">
+
+      {/* WhatsApp */}
+      <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4 sm:p-6 space-y-5">
         <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">WhatsApp</h2>
 
         <div>
@@ -386,20 +422,18 @@ function TabConfiguracion() {
             value={numero}
             onChange={(e) => setNumero(e.target.value)}
             placeholder="593999999999"
-            className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
+            className={inputCls}
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-300 mb-1">
-            Mensaje predeterminado
-          </label>
+          <label className="block text-sm font-medium text-gray-300 mb-1">Mensaje predeterminado</label>
           <textarea
             value={mensaje}
             onChange={(e) => setMensaje(e.target.value)}
             rows={3}
             placeholder="Hola! Quiero más información sobre Folk."
-            className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition resize-none"
+            className={`${inputCls} resize-none`}
           />
         </div>
 
@@ -411,20 +445,147 @@ function TabConfiguracion() {
             </span>
           </div>
         )}
+      </div>
+
+      {/* Protección de datos */}
+      <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4 sm:p-6 space-y-5">
+        <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">Protección de datos</h2>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-1">
+            Versión de política
+            <span className="text-gray-500 font-normal ml-1">(ej: 2026-03)</span>
+          </label>
+          <input
+            type="text"
+            value={ppVersion}
+            onChange={(e) => setPpVersion(e.target.value)}
+            placeholder="2026-03"
+            className={inputCls}
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-1">URL de política de privacidad</label>
+          <input
+            type="url"
+            value={ppUrl}
+            onChange={(e) => setPpUrl(e.target.value)}
+            placeholder="https://folk.binnso.com/privacidad"
+            className={inputCls}
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-1">
+            Aviso corto de privacidad
+            <span className="text-gray-500 font-normal ml-1">(se muestra en formularios de inscripción)</span>
+          </label>
+          <textarea
+            value={avisoCorto}
+            onChange={(e) => setAvisoCorto(e.target.value)}
+            rows={4}
+            placeholder="Al registrarte, aceptas el tratamiento de tus datos personales conforme a nuestra política de privacidad."
+            className={`${inputCls} resize-none`}
+          />
+        </div>
+      </div>
+
+      {/* Correo saliente */}
+      <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4 sm:p-6 space-y-5">
+        <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">Correo saliente (SMTP)</h2>
+        <p className="text-xs text-gray-500">
+          Configura aquí el servidor SMTP para el envío de correos automáticos (aprobación de participantes, recuperación de contraseña, etc.).
+        </p>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div className="col-span-2 sm:col-span-1">
+            <label className="block text-sm font-medium text-gray-300 mb-1">Servidor SMTP</label>
+            <input
+              type="text"
+              value={emailHost}
+              onChange={(e) => setEmailHost(e.target.value)}
+              placeholder="smtp.gmail.com"
+              className={inputCls}
+            />
+          </div>
+          <div className="col-span-2 sm:col-span-1">
+            <label className="block text-sm font-medium text-gray-300 mb-1">Puerto</label>
+            <input
+              type="number"
+              value={emailPort}
+              onChange={(e) => setEmailPort(e.target.value)}
+              placeholder="587"
+              className={inputCls}
+            />
+          </div>
+        </div>
 
         <div className="flex items-center gap-3">
-          <button
-            onClick={handleSave}
-            disabled={updateMutation.isPending}
-            className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white font-semibold rounded-xl text-sm transition"
-          >
-            {updateMutation.isPending ? "Guardando…" : "Guardar cambios"}
-          </button>
-          {saved && <span className="text-green-400 text-sm">¡Guardado!</span>}
-          {updateMutation.isError && (
-            <span className="text-red-400 text-sm">Error al guardar.</span>
-          )}
+          <input
+            id="use-tls"
+            type="checkbox"
+            checked={emailUseTls}
+            onChange={(e) => setEmailUseTls(e.target.checked)}
+            className="w-4 h-4 accent-indigo-500"
+          />
+          <label htmlFor="use-tls" className="text-sm text-gray-300">Usar TLS</label>
         </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-1">Usuario / correo de envío</label>
+          <input
+            type="email"
+            value={emailUser}
+            onChange={(e) => setEmailUser(e.target.value)}
+            placeholder="noreply@tudominio.com"
+            className={inputCls}
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-1">
+            Contraseña / App Password
+            <span className="text-gray-500 font-normal ml-1">(déjalo vacío para no cambiarla)</span>
+          </label>
+          <input
+            type="password"
+            value={emailPassword}
+            onChange={(e) => setEmailPassword(e.target.value)}
+            placeholder="••••••••"
+            autoComplete="new-password"
+            className={inputCls}
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-1">
+            Dirección From:
+            <span className="text-gray-500 font-normal ml-1">(si es distinta al usuario)</span>
+          </label>
+          <input
+            type="email"
+            value={emailFrom}
+            onChange={(e) => setEmailFrom(e.target.value)}
+            placeholder="Folk Eventos <noreply@tudominio.com>"
+            className={inputCls}
+          />
+        </div>
+      </div>
+
+      {/* Guardar */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+        <button
+          onClick={handleSave}
+          disabled={updateMutation.isPending}
+          className="px-5 py-3 sm:py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white font-semibold rounded-xl text-sm transition"
+        >
+          {updateMutation.isPending ? "Guardando…" : "Guardar cambios"}
+        </button>
+        {saved && <span className="text-green-400 text-sm">¡Guardado!</span>}
+        {updateMutation.isError && (
+          <span className="text-red-400 text-sm">Error al guardar.</span>
+        )}
       </div>
     </div>
   );
@@ -449,12 +610,12 @@ export default function SuperadminPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-gray-900 border border-gray-800 rounded-xl p-1 w-fit">
+      <div className="flex gap-1 bg-gray-900 border border-gray-800 rounded-xl p-1 w-full sm:w-fit">
         {tabs.map((t) => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+            className={`flex-1 sm:flex-none px-4 py-2.5 sm:py-2 rounded-lg text-sm font-medium transition ${
               tab === t.id
                 ? "bg-indigo-600 text-white"
                 : "text-gray-400 hover:text-white"

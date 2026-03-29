@@ -200,7 +200,7 @@ export default function ParticipantesPage() {
               </span>
             )}
           </div>
-          <div className="flex gap-1">
+          <div className="flex gap-1 flex-wrap">
             {ESTADOS.map((e) => (
               <button
                 key={String(e.value)}
@@ -228,7 +228,8 @@ export default function ParticipantesPage() {
               {filtro ? "No hay registros con ese estado." : "Aún no hay registros de participantes."}
             </p>
           ) : (
-            <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[600px]">
               <thead className="bg-gray-50 border-b border-gray-100">
                 <tr>
                   <th className="text-left px-4 py-3 text-xs text-gray-500 font-medium">Participante</th>
@@ -249,6 +250,7 @@ export default function ParticipantesPage() {
                 ))}
               </tbody>
             </table>
+          </div>
           )}
         </div>
       </div>

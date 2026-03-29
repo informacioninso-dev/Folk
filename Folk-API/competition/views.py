@@ -8,7 +8,7 @@ from django.core.files.storage import FileSystemStorage
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.contrib.auth import get_user_model
 from django.contrib.auth.tokens import default_token_generator
-from django.core.mail import send_mail
+from django.core.mail import send_mail, get_connection
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from rest_framework import viewsets, status
@@ -78,6 +78,38 @@ from .serializers import (
     RegistroGeneralPublicoSerializer,
     RegistroPublicoSerializer,
 )
+
+
+# ─── Email helpers ───────────────────────────────────────────────────────────
+
+def _get_email_connection_and_from():
+    """Returns (connection, from_email) using SiteConfig if configured, else None/default."""
+    config = SiteConfig.get()
+    if config.email_host:
+        conn = get_connection(
+            host=config.email_host,
+            port=config.email_port,
+            username=config.email_host_user,
+            password=config.email_host_password,
+            use_tls=config.email_use_tls,
+            fail_silently=False,
+        )
+        from_email = config.email_from or config.email_host_user or settings.DEFAULT_FROM_EMAIL
+        return conn, from_email
+    return None, settings.DEFAULT_FROM_EMAIL
+
+
+def folk_send_mail(subject, message, recipient_list, html_message=None):
+    connection, from_email = _get_email_connection_and_from()
+    send_mail(
+        subject=subject,
+        message=message,
+        from_email=from_email,
+        recipient_list=recipient_list,
+        html_message=html_message,
+        connection=connection,
+        fail_silently=False,
+    )
 
 
 # ─── JWT personalizado con claims extra ──────────────────────────────────────
@@ -961,22 +993,23 @@ class ParticipanteGeneralViewSet(viewsets.ModelViewSet):
         # Enviar email de bienvenida si se creó nueva cuenta
         if plain_password is not None:
             frontend_url = getattr(settings, "FRONTEND_URL", "")
-            send_mail(
-                subject=f"Acceso al portal Folk — {participante.evento.nombre}",
-                message=(
-                    f"Hola {participante.nombre_completo},\n\n"
-                    f"Tu registro para '{participante.evento.nombre}' ha sido aprobado.\n\n"
-                    f"Ya puedes ingresar al portal de participantes:\n"
-                    f"{frontend_url}/login\n\n"
-                    f"  Usuario: {participante.cedula}\n"
-                    f"  Contraseña: {plain_password}\n\n"
-                    f"Te recomendamos cambiar tu contraseña después de ingresar.\n"
-                    f"Si tienes problemas, usa la opción '¿Olvidaste tu contraseña?'."
-                ),
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[participante.correo_electronico],
-                fail_silently=True,
-            )
+            try:
+                folk_send_mail(
+                    subject=f"Acceso al portal Folk — {participante.evento.nombre}",
+                    message=(
+                        f"Hola {participante.nombre_completo},\n\n"
+                        f"Tu registro para '{participante.evento.nombre}' ha sido aprobado.\n\n"
+                        f"Ya puedes ingresar al portal de participantes:\n"
+                        f"{frontend_url}/login\n\n"
+                        f"  Usuario: {participante.cedula}\n"
+                        f"  Contraseña: {plain_password}\n\n"
+                        f"Te recomendamos cambiar tu contraseña después de ingresar.\n"
+                        f"Si tienes problemas, usa la opción '¿Olvidaste tu contraseña?'."
+                    ),
+                    recipient_list=[participante.correo_electronico],
+                )
+            except Exception:
+                pass  # No bloquear la aprobación si falla el correo
 
         return Response(ParticipanteGeneralSerializer(participante).data)
 
@@ -1426,16 +1459,15 @@ class PasswordResetView(MethodScopedThrottleMixin, APIView):
             uid = urlsafe_base64_encode(force_bytes(user.pk))
             token = default_token_generator.make_token(user)
             reset_url = f"{settings.FRONTEND_URL}/reset-password/{uid}/{token}"
-            send_mail(
-                subject="Recuperar contrase?a - Folk",
+            folk_send_mail(
+                subject="Recuperar contraseña - Folk",
                 message=(
                     f"Hola {user.username}\n\n"
-                    "Haz clic en el siguiente enlace para restablecer tu contrase?a:\n"
+                    "Haz clic en el siguiente enlace para restablecer tu contraseña:\n"
                     f"{reset_url}\n\n"
                     "El enlace expira en 24 horas.\n"
                     f"Si no solicitaste esto, ignora este mensaje."
                 ),
-                from_email=settings.DEFAULT_FROM_EMAIL,
                 recipient_list=[email],
             )
 

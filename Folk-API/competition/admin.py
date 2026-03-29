@@ -171,6 +171,12 @@ class SiteConfigAdmin(admin.ModelAdmin):
         "politica_privacidad_version",
         "politica_privacidad_url",
         "aviso_privacidad_corto",
+        "email_host",
+        "email_port",
+        "email_use_tls",
+        "email_host_user",
+        "email_host_password",
+        "email_from",
     )
 
 

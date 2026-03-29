@@ -91,12 +91,12 @@ function FilaItem({
   });
 
   return (
-    <div className="flex items-start gap-4 px-4 py-3.5 border-b border-gray-100 last:border-0 hover:bg-gray-50 group transition-colors">
+    <div className="flex items-start gap-2 sm:gap-4 px-3 sm:px-4 py-3 sm:py-3.5 border-b border-gray-100 last:border-0 hover:bg-gray-50 group transition-colors">
       {/* Orden */}
       <span className="text-sm font-bold text-gray-300 w-5 pt-0.5 shrink-0">{item.orden}</span>
 
       {/* Horas */}
-      <div className="text-xs text-gray-500 w-24 shrink-0 pt-0.5 space-y-0.5">
+      <div className="text-xs text-gray-500 w-16 sm:w-24 shrink-0 pt-0.5 space-y-0.5">
         {item.hora_inicio && (
           <p className="font-mono">
             {formatTime(item.hora_inicio)}
@@ -116,7 +116,7 @@ function FilaItem({
       </div>
 
       {/* Acciones */}
-      <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+      <div className="flex gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shrink-0">
         <button
           onClick={() => onEdit(item)}
           className="text-xs text-indigo-500 hover:text-indigo-700 transition-colors"
@@ -250,7 +250,7 @@ function FormItem({
       </div>
 
       {/* Hora inicio / fin / duración */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div>
           <label className="block text-xs text-gray-500 mb-1">Hora inicio</label>
           <input

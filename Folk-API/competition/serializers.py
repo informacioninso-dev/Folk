@@ -1238,6 +1238,11 @@ class MiAgendaItemSerializer(serializers.ModelSerializer):
 # ─── SiteConfig ───────────────────────────────────────────────────────────────
 
 class SiteConfigSerializer(serializers.ModelSerializer):
+    email_host_password = serializers.CharField(
+        write_only=True, required=False, allow_blank=True,
+        style={"input_type": "password"},
+    )
+
     class Meta:
         model  = SiteConfig
         fields = (
@@ -1246,6 +1251,12 @@ class SiteConfigSerializer(serializers.ModelSerializer):
             "politica_privacidad_version",
             "politica_privacidad_url",
             "aviso_privacidad_corto",
+            "email_host",
+            "email_port",
+            "email_use_tls",
+            "email_host_user",
+            "email_host_password",
+            "email_from",
         )
 
 

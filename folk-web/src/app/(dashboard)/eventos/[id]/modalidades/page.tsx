@@ -179,7 +179,8 @@ function SeccionInscripciones({
       {isLoading ? (
         <div className="p-4 animate-pulse"><div className="h-8 bg-gray-100 rounded" /></div>
       ) : (
-        <table className="w-full text-sm">
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm min-w-[500px]">
           <thead className="border-b border-gray-100 bg-white">
             <tr>
               <th className="text-left px-4 py-2 text-xs text-gray-400 font-medium">Acto</th>
@@ -200,6 +201,7 @@ function SeccionInscripciones({
             ))}
           </tbody>
         </table>
+      </div>
       )}
     </div>
   );
@@ -272,8 +274,8 @@ export default function ModalidadesPage() {
           <h2 className="font-semibold text-gray-800">Categorías</h2>
 
           <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
-            <div className="flex items-end gap-3 flex-wrap">
-              <div className="flex-1 min-w-48">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-3">
+              <div className="flex-1 min-w-0">
                 <label className="block text-xs text-gray-500 mb-1">Nombre del ritmo</label>
                 <input
                   value={nombre}
@@ -286,7 +288,7 @@ export default function ModalidadesPage() {
 
               <div>
                 <label className="block text-xs text-gray-500 mb-1">Tipos de participación</label>
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                   {TODAS_MODALIDADES.map((m) => {
                     const active = seleccion.has(m);
                     return (

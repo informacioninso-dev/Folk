@@ -463,6 +463,19 @@ class SiteConfig(models.Model):
     politica_privacidad_url = models.URLField(blank=True, default="")
     aviso_privacidad_corto = models.TextField(blank=True, default="")
 
+    # Configuración de correo saliente
+    email_host          = models.CharField(max_length=255, blank=True, default="",
+                                           help_text="Ej: smtp.gmail.com")
+    email_port          = models.PositiveIntegerField(default=587,
+                                                      help_text="Puerto SMTP (587 para TLS, 465 para SSL)")
+    email_use_tls       = models.BooleanField(default=True)
+    email_host_user     = models.CharField(max_length=255, blank=True, default="",
+                                           help_text="Usuario / dirección del remitente")
+    email_host_password = models.CharField(max_length=255, blank=True, default="",
+                                           help_text="Contraseña o App Password")
+    email_from          = models.EmailField(blank=True, default="",
+                                            help_text="Dirección que verá el destinatario (From:)")
+
     class Meta:
         verbose_name = "Configuración del sitio"
 
