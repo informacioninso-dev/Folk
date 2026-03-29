@@ -31,12 +31,20 @@ function NuevoEventoModal({ onClose }: { onClose: () => void }) {
     defaultValues: { activo: false },
   });
 
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
   const onSubmit = (values: FormValues) => {
     if (!me?.organizador_id) return;
-    crearMutation.mutate(
-      values,
-      { onSuccess: onClose }
-    );
+    setErrorMsg(null);
+    crearMutation.mutate(values, {
+      onSuccess: onClose,
+      onError: (err: unknown) => {
+        const msg =
+          (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+          ?? "Error al crear el evento. Intenta de nuevo.";
+        setErrorMsg(msg);
+      },
+    });
   };
 
   return (
@@ -75,8 +83,8 @@ function NuevoEventoModal({ onClose }: { onClose: () => void }) {
             <span className="text-sm text-gray-700">Publicar evento inmediatamente</span>
           </label>
 
-          {crearMutation.isError && (
-            <p className="text-sm text-red-500">Error al crear el evento. Intenta de nuevo.</p>
+          {errorMsg && (
+            <p className="text-sm text-red-500">{errorMsg}</p>
           )}
 
           <div className="flex gap-3 pt-1">
