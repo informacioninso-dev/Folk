@@ -119,6 +119,9 @@ class OrganizadorSerializer(serializers.ModelSerializer):
             "whatsapp_mensaje",
             "notas_internas",
             "max_eventos",
+            "plan_nombre",
+            "plan_fecha_venc",
+            "plan_notas",
             "created_at",
             "updated_at",
         )

@@ -80,6 +80,33 @@ export function useUpdateSiteConfig() {
   });
 }
 
+export function useEnviarComunicado() {
+  return useMutation({
+    mutationFn: (data: { asunto: string; mensaje: string; organizador_id?: number | null }) =>
+      superadminApi.enviarComunicado(data),
+  });
+}
+
+export function useActualizarPlan(organizadorId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { plan_nombre?: string; plan_fecha_venc?: string | null; plan_notas?: string; max_eventos?: number }) =>
+      superadminApi.actualizarPlan(organizadorId, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["sa", "organizadores", organizadorId] });
+      qc.invalidateQueries({ queryKey: ["sa", "organizadores"] });
+    },
+  });
+}
+
+export function useActividadOrganizador(organizadorId: number) {
+  return useQuery({
+    queryKey: ["sa", "actividad", organizadorId] as const,
+    queryFn: () => superadminApi.getActividadOrganizador(organizadorId),
+    refetchInterval: 30_000,
+  });
+}
+
 export function useSuperadminDashboard() {
   return useQuery({
     queryKey: ["sa", "dashboard"] as const,
@@ -96,6 +123,23 @@ export function useUpdateNotasInternas(organizadorId: number) {
       qc.invalidateQueries({ queryKey: ["sa", "organizadores", organizadorId] });
       qc.invalidateQueries({ queryKey: ["sa", "organizadores"] });
     },
+  });
+}
+
+export function usePagosFullPassDeEvento(eventoId: number | null) {
+  return useQuery({
+    queryKey: ["sa", "pagos-fp", eventoId] as const,
+    queryFn: () => superadminApi.getPagosFullPassDeEvento(eventoId!),
+    enabled: eventoId !== null,
+  });
+}
+
+export function useActualizarEstadoPagoFP(eventoId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ pagoId, data }: { pagoId: number; data: { estado: string; nota_rechazo?: string } }) =>
+      superadminApi.actualizarEstadoPagoFP(pagoId, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["sa", "pagos-fp", eventoId] }),
   });
 }
 

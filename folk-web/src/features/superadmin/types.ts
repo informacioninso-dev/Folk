@@ -7,6 +7,9 @@ export interface OrganizadorDetalle {
   email_contacto: string;
   notas_internas: string;
   max_eventos: number;
+  plan_nombre: string;
+  plan_fecha_venc: string | null;
+  plan_notas: string;
   created_at: string;
 }
 
@@ -39,6 +42,27 @@ export interface DashboardStats {
 export interface DashboardData {
   eventos: DashboardEvento[];
   estadisticas: DashboardStats;
+}
+
+export interface ActividadItem {
+  tipo: string;
+  descripcion: string;
+  estado: string;
+  fecha: string;
+}
+
+export interface PagoFullPassSA {
+  id: number;
+  evento: number;
+  cedula: string;
+  nombre_completo: string;
+  correo_electronico: string;
+  telefono: string;
+  comprobante_imagen_url: string | null;
+  numero_comprobante: string;
+  estado: "pendiente" | "aprobado" | "rechazado";
+  nota_rechazo: string;
+  created_at: string;
 }
 
 export interface SiteConfig {

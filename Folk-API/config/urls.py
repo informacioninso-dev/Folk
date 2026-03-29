@@ -14,6 +14,8 @@ from competition.views import (
     SiteConfigView,
     BuscarParticipanteView,
     SuperadminDashboardView,
+    OrganizadorActividadView,
+    ComunicadoView,
     CalificacionViewSet,
     CategoriaRitmoViewSet,
     CronogramaLiveView,
@@ -125,4 +127,8 @@ urlpatterns = [
     path("api/v1/site-config/", SiteConfigView.as_view(), name="site_config"),
     # Dashboard superadmin
     path("api/v1/superadmin/dashboard/", SuperadminDashboardView.as_view(), name="superadmin_dashboard"),
+    # Historial de actividad por organizador
+    path("api/v1/superadmin/organizadores/<int:pk>/actividad/", OrganizadorActividadView.as_view(), name="organizador_actividad"),
+    # Comunicados a organizadores
+    path("api/v1/superadmin/comunicados/", ComunicadoView.as_view(), name="comunicados"),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

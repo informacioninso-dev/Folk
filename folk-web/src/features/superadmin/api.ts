@@ -1,5 +1,5 @@
 import { apiClient } from "@/lib/api-client";
-import type { OrganizadorDetalle, CrearClientePayload, SiteConfig, DashboardData } from "./types";
+import type { OrganizadorDetalle, CrearClientePayload, SiteConfig, DashboardData, PagoFullPassSA, ActividadItem } from "./types";
 import type { Evento } from "@/features/eventos/types";
 
 export const superadminApi = {
@@ -55,5 +55,30 @@ export const superadminApi = {
   updateNotasInternas: (organizadorId: number, notas_internas: string) =>
     apiClient
       .patch<OrganizadorDetalle>(`/organizadores/${organizadorId}/`, { notas_internas })
+      .then((r) => r.data),
+
+  getPagosFullPassDeEvento: (eventoId: number) =>
+    apiClient
+      .get<PagoFullPassSA[]>("/pagos-full-pass/", { params: { evento: eventoId } })
+      .then((r) => r.data),
+
+  actualizarEstadoPagoFP: (pagoId: number, data: { estado: string; nota_rechazo?: string }) =>
+    apiClient
+      .patch<PagoFullPassSA>(`/pagos-full-pass/${pagoId}/`, data)
+      .then((r) => r.data),
+
+  getActividadOrganizador: (organizadorId: number) =>
+    apiClient
+      .get<ActividadItem[]>(`/superadmin/organizadores/${organizadorId}/actividad/`)
+      .then((r) => r.data),
+
+  actualizarPlan: (organizadorId: number, data: { plan_nombre?: string; plan_fecha_venc?: string | null; plan_notas?: string; max_eventos?: number }) =>
+    apiClient
+      .patch<OrganizadorDetalle>(`/organizadores/${organizadorId}/`, data)
+      .then((r) => r.data),
+
+  enviarComunicado: (data: { asunto: string; mensaje: string; organizador_id?: number | null }) =>
+    apiClient
+      .post<{ enviados: number; destinatarios: string[] }>("/superadmin/comunicados/", data)
       .then((r) => r.data),
 };

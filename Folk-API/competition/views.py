@@ -472,6 +472,114 @@ class HealthCheckView(APIView):
         return Response({"status": "ok"})
 
 
+# ─── Historial de actividad por organizador ───────────────────────────────────
+
+class OrganizadorActividadView(APIView):
+    permission_classes = [IsAdminUser]
+
+    def get(self, request, pk):
+        try:
+            org = Organizador.objects.get(pk=pk)
+        except Organizador.DoesNotExist:
+            return Response({"detail": "No encontrado."}, status=404)
+
+        eventos_ids = list(org.eventos.values_list("id", flat=True))
+        actividad = []
+
+        # Inscripciones recientes (últimas 100)
+        inscripciones = (
+            Inscripcion.objects
+            .filter(categoria_ritmo__evento_id__in=eventos_ids)
+            .select_related("categoria_ritmo__evento")
+            .order_by("-created_at")[:50]
+        )
+        for i in inscripciones:
+            actividad.append({
+                "tipo": "inscripcion",
+                "descripcion": f"Inscripción: {i.nombre_acto} — {i.categoria_ritmo.nombre_ritmo} ({i.categoria_ritmo.evento.nombre})",
+                "estado": i.estado_inscripcion,
+                "fecha": i.created_at.isoformat(),
+            })
+
+        # Pagos Full Pass recientes
+        pagos_fp = (
+            PagoFullPass.objects
+            .filter(evento_id__in=eventos_ids)
+            .select_related("evento")
+            .order_by("-created_at")[:50]
+        )
+        for p in pagos_fp:
+            actividad.append({
+                "tipo": "full_pass",
+                "descripcion": f"Full Pass: {p.nombre_completo} ({p.cedula}) — {p.evento.nombre}",
+                "estado": p.estado,
+                "fecha": p.created_at.isoformat(),
+            })
+
+        # Cambios de estado de Full Pass (updated_at != created_at)
+        pagos_actualizados = (
+            PagoFullPass.objects
+            .filter(evento_id__in=eventos_ids)
+            .exclude(updated_at=models.F("created_at"))
+            .select_related("evento")
+            .order_by("-updated_at")[:30]
+        )
+        for p in pagos_actualizados:
+            actividad.append({
+                "tipo": "full_pass_actualizado",
+                "descripcion": f"FP {p.estado}: {p.nombre_completo} — {p.evento.nombre}",
+                "estado": p.estado,
+                "fecha": p.updated_at.isoformat(),
+            })
+
+        # Ordenar todo por fecha descendente y limitar a 80 entradas
+        actividad.sort(key=lambda x: x["fecha"], reverse=True)
+        return Response(actividad[:80])
+
+
+# ─── Comunicados a organizadores ─────────────────────────────────────────────
+
+class ComunicadoView(APIView):
+    permission_classes = [IsAdminUser]
+
+    def post(self, request):
+        """
+        Body: { asunto, mensaje, organizador_id (opcional, None = todos) }
+        """
+        asunto = (request.data.get("asunto") or "").strip()
+        mensaje = (request.data.get("mensaje") or "").strip()
+        organizador_id = request.data.get("organizador_id")
+
+        if not asunto or not mensaje:
+            return Response({"detail": "asunto y mensaje son requeridos."}, status=400)
+
+        if organizador_id:
+            try:
+                orgs = [Organizador.objects.get(pk=organizador_id)]
+            except Organizador.DoesNotExist:
+                return Response({"detail": "Organizador no encontrado."}, status=404)
+        else:
+            orgs = list(Organizador.objects.filter(email_contacto__isnull=False).exclude(email_contacto=""))
+
+        destinatarios = [o.email_contacto for o in orgs if o.email_contacto]
+        if not destinatarios:
+            return Response({"detail": "No hay destinatarios con email configurado."}, status=400)
+
+        try:
+            folk_send_mail(
+                subject=f"[Folk] {asunto}",
+                message=mensaje,
+                recipient_list=destinatarios,
+            )
+        except Exception as e:
+            return Response({"detail": f"Error al enviar: {str(e)}"}, status=500)
+
+        return Response({
+            "enviados": len(destinatarios),
+            "destinatarios": destinatarios,
+        })
+
+
 # ─── Superadmin Dashboard ─────────────────────────────────────────────────────
 
 class SuperadminDashboardView(APIView):

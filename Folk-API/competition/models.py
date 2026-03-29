@@ -44,8 +44,14 @@ class Organizador(BaseModel):
     # Notas internas Folk (solo visibles para superadmin)
     notas_internas = models.TextField(blank=True, default="",
                                       help_text="Notas privadas del equipo Folk sobre este cliente")
-    # Límite de eventos (Fase 1: cobro por evento)
-    max_eventos    = models.PositiveIntegerField(default=1)
+    # Plan y créditos
+    max_eventos        = models.PositiveIntegerField(default=1)
+    plan_nombre        = models.CharField(max_length=50, blank=True, default="",
+                                          help_text="Nombre del plan (ej: Básico, Pro, Enterprise)")
+    plan_fecha_venc    = models.DateField(null=True, blank=True,
+                                          help_text="Fecha de vencimiento del plan")
+    plan_notas         = models.TextField(blank=True, default="",
+                                          help_text="Notas sobre el plan o historial de pagos a Folk")
     # Equipo: usuarios adicionales con acceso al panel
     miembros       = models.ManyToManyField(
         settings.AUTH_USER_MODEL,

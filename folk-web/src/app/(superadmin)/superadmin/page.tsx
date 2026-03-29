@@ -13,6 +13,7 @@ import {
   useSiteConfig,
   useUpdateSiteConfig,
   useSuperadminDashboard,
+  useEnviarComunicado,
 } from "@/features/superadmin/hooks";
 import type { OrganizadorDetalle, DashboardEvento, DashboardStats } from "@/features/superadmin/types";
 
@@ -592,6 +593,134 @@ function TabConfiguracion() {
   );
 }
 
+// ─── Tab Comunicados ──────────────────────────────────────────────────────────
+
+function TabComunicados() {
+  const { data: organizadores } = useOrganizadores();
+  const mutation = useEnviarComunicado();
+
+  const [destinatario, setDestinatario] = useState<"todos" | number>("todos");
+  const [asunto, setAsunto] = useState("");
+  const [mensaje, setMensaje] = useState("");
+  const [resultado, setResultado] = useState<{ enviados: number; destinatarios: string[] } | null>(null);
+
+  const handleEnviar = () => {
+    if (!asunto.trim() || !mensaje.trim()) return;
+    if (!confirm(
+      destinatario === "todos"
+        ? `¿Enviar a todos los clientes (${organizadores?.length ?? "?"} destinatarios)?`
+        : "¿Enviar comunicado a este cliente?"
+    )) return;
+
+    mutation.mutate(
+      {
+        asunto,
+        mensaje,
+        organizador_id: destinatario === "todos" ? null : destinatario,
+      },
+      {
+        onSuccess: (data) => {
+          setResultado(data);
+          setAsunto("");
+          setMensaje("");
+          setDestinatario("todos");
+        },
+      }
+    );
+  };
+
+  const inputCls = "w-full px-3 py-3 sm:py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition";
+
+  return (
+    <div className="w-full max-w-lg space-y-6">
+      <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4 sm:p-6 space-y-5">
+        <div>
+          <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">Nuevo comunicado</h2>
+          <p className="text-xs text-gray-500 mt-1">
+            Envía un email a uno o todos tus clientes directamente desde aquí.
+          </p>
+        </div>
+
+        {/* Destinatario */}
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-1">Destinatario</label>
+          <select
+            value={destinatario === "todos" ? "todos" : String(destinatario)}
+            onChange={(e) => setDestinatario(e.target.value === "todos" ? "todos" : Number(e.target.value))}
+            className={inputCls}
+          >
+            <option value="todos">Todos los clientes</option>
+            {organizadores?.map((org) => (
+              <option key={org.id} value={String(org.id)}>
+                {org.nombre} ({org.email_contacto})
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Asunto */}
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-1">Asunto</label>
+          <input
+            type="text"
+            value={asunto}
+            onChange={(e) => setAsunto(e.target.value)}
+            placeholder="Ej: Mantenimiento programado del sistema"
+            className={inputCls}
+          />
+        </div>
+
+        {/* Mensaje */}
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-1">Mensaje</label>
+          <textarea
+            value={mensaje}
+            onChange={(e) => setMensaje(e.target.value)}
+            rows={6}
+            placeholder="Escribe aquí el contenido del comunicado…"
+            className={`${inputCls} resize-none`}
+          />
+        </div>
+
+        {/* Enviar */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          <button
+            onClick={handleEnviar}
+            disabled={mutation.isPending || !asunto.trim() || !mensaje.trim()}
+            className="px-5 py-3 sm:py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white font-semibold rounded-xl text-sm transition"
+          >
+            {mutation.isPending ? "Enviando…" : "Enviar comunicado"}
+          </button>
+        </div>
+
+        {mutation.isError && (
+          <p className="text-sm text-red-400">Error al enviar. Verifica la configuración SMTP en Configuración general.</p>
+        )}
+      </div>
+
+      {/* Confirmación */}
+      {resultado && (
+        <div className="bg-green-900/40 border border-green-700 rounded-2xl p-4 sm:p-6">
+          <p className="text-green-300 font-semibold text-sm mb-2">
+            ✓ Comunicado enviado a {resultado.enviados} destinatario(s)
+          </p>
+          <ul className="space-y-0.5">
+            {resultado.destinatarios.map((d) => (
+              <li key={d} className="text-xs text-green-400 font-mono">{d}</li>
+            ))}
+          </ul>
+          <button
+            onClick={() => setResultado(null)}
+            className="mt-3 text-xs text-green-500 hover:text-green-300 transition"
+          >
+            Cerrar
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Tab Panel (Dashboard) ────────────────────────────────────────────────────
 
 function StatCard({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
@@ -756,7 +885,7 @@ function TabPanel() {
 
 // ─── Página principal ─────────────────────────────────────────────────────────
 
-type Tab = "panel" | "clientes" | "configuracion";
+type Tab = "panel" | "clientes" | "comunicados" | "configuracion";
 
 export default function SuperadminPage() {
   const [tab, setTab] = useState<Tab>("panel");
@@ -764,6 +893,7 @@ export default function SuperadminPage() {
   const tabs: { id: Tab; label: string }[] = [
     { id: "panel",         label: "Panel" },
     { id: "clientes",      label: "Clientes" },
+    { id: "comunicados",   label: "Comunicados" },
     { id: "configuracion", label: "Configuración" },
   ];
 
@@ -792,6 +922,7 @@ export default function SuperadminPage() {
 
       {tab === "panel"         && <TabPanel />}
       {tab === "clientes"      && <TabClientes />}
+      {tab === "comunicados"   && <TabComunicados />}
       {tab === "configuracion" && <TabConfiguracion />}
     </div>
   );
