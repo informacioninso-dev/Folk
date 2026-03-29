@@ -201,7 +201,10 @@ class EventoSerializer(serializers.ModelSerializer):
             "updated_at",
         )
         read_only_fields = ("id", "slug", "banner_url", "created_at", "updated_at")
-        extra_kwargs = {"banner": {"write_only": True, "required": False}}
+        extra_kwargs = {
+            "banner": {"write_only": True, "required": False},
+            "organizador": {"required": False},
+        }
 
 
 # ─── Categoría y Participante ─────────────────────────────────────────────────
