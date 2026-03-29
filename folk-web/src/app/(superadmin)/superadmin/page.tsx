@@ -257,7 +257,7 @@ function NuevoClienteModal({
 // ─── Tab Clientes ─────────────────────────────────────────────────────────────
 
 function TabClientes() {
-  const { data: organizadores, isLoading } = useOrganizadores();
+  const { data: organizadores, isLoading, isError } = useOrganizadores();
   const eliminarMutation = useEliminarOrganizador();
   const [showModal, setShowModal] = useState(false);
   const [creds, setCreds] = useState<Credentials | null>(null);
@@ -284,14 +284,20 @@ function TabClientes() {
         </div>
       )}
 
-      {organizadores && organizadores.length === 0 && (
+      {isError && (
+        <div className="bg-red-950/50 border border-red-800 rounded-xl px-4 py-3 text-sm text-red-400">
+          Error al cargar clientes. Verifica que las migraciones estén aplicadas y el servidor esté corriendo.
+        </div>
+      )}
+
+      {!isLoading && !isError && organizadores && organizadores.length === 0 && (
         <div className="text-center py-20 text-gray-600">
           <p className="text-lg">No hay clientes registrados aún.</p>
           <p className="text-sm mt-1">Crea el primer organizador con el botón de arriba.</p>
         </div>
       )}
 
-      {organizadores && organizadores.length > 0 && (
+      {!isLoading && !isError && organizadores && organizadores.length > 0 && (
         <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
           <div className="overflow-x-auto">
           <table className="w-full text-sm min-w-[640px]">
