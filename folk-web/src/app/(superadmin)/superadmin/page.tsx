@@ -12,8 +12,9 @@ import {
   useResetPassword,
   useSiteConfig,
   useUpdateSiteConfig,
+  useSuperadminDashboard,
 } from "@/features/superadmin/hooks";
-import type { OrganizadorDetalle } from "@/features/superadmin/types";
+import type { OrganizadorDetalle, DashboardEvento, DashboardStats } from "@/features/superadmin/types";
 
 // ─── Schema ───────────────────────────────────────────────────────────────────
 
@@ -591,16 +592,179 @@ function TabConfiguracion() {
   );
 }
 
+// ─── Tab Panel (Dashboard) ────────────────────────────────────────────────────
+
+function StatCard({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
+  return (
+    <div className="bg-gray-900 border border-gray-800 rounded-2xl px-5 py-4">
+      <p className="text-2xl font-extrabold text-white">{value}</p>
+      <p className="text-xs text-gray-400 mt-0.5">{label}</p>
+      {sub && <p className="text-xs text-gray-600 mt-1">{sub}</p>}
+    </div>
+  );
+}
+
+function EventoRow({ ev }: { ev: DashboardEvento }) {
+  const fecha = new Date(ev.fecha + "T00:00:00").toLocaleDateString("es-EC", {
+    weekday: "short", day: "numeric", month: "short",
+  });
+
+  return (
+    <div className={`bg-gray-900 border rounded-xl p-4 space-y-3 ${
+      ev.es_hoy ? "border-indigo-700" : "border-gray-800"
+    }`}>
+      {/* Header */}
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            {ev.es_hoy && (
+              <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-indigo-600 text-white">HOY</span>
+            )}
+            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+              ev.portal_activo ? "bg-emerald-900 text-emerald-300" : "bg-gray-800 text-gray-500"
+            }`}>
+              {ev.portal_activo ? "Portal activo" : "Portal inactivo"}
+            </span>
+            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+              ev.pago_folk_confirmado ? "bg-green-900 text-green-300" : "bg-orange-950 text-orange-400"
+            }`}>
+              {ev.pago_folk_confirmado ? "Pagado" : "Pago pendiente"}
+            </span>
+          </div>
+          <h3 className="text-white font-bold mt-1.5">{ev.nombre}</h3>
+          <p className="text-xs text-gray-500 mt-0.5">{fecha} · {ev.ubicacion}</p>
+        </div>
+
+        {/* Links */}
+        <div className="flex gap-2 shrink-0">
+          <Link
+            href={`/superadmin/organizadores/${ev.organizador_id}`}
+            className="text-xs text-gray-400 hover:text-white transition px-2 py-1 border border-gray-700 rounded-lg"
+          >
+            {ev.organizador_nombre}
+          </Link>
+          <Link
+            href={`/eventos/${ev.id}`}
+            className="text-xs text-indigo-400 hover:text-indigo-300 transition px-2 py-1 border border-indigo-900 rounded-lg font-medium"
+          >
+            Ir al evento →
+          </Link>
+        </div>
+      </div>
+
+      {/* Métricas */}
+      <div className="grid grid-cols-3 gap-2">
+        <div className="bg-gray-800 rounded-lg px-3 py-2 text-center">
+          <p className="text-lg font-bold text-white">{ev.inscripciones_total}</p>
+          <p className="text-xs text-gray-500">Inscritos</p>
+        </div>
+        <div className="bg-gray-800 rounded-lg px-3 py-2 text-center">
+          <p className={`text-lg font-bold ${ev.full_pass_pendientes > 0 ? "text-orange-400" : "text-white"}`}>
+            {ev.full_pass_pendientes}
+          </p>
+          <p className="text-xs text-gray-500">FP pendientes</p>
+        </div>
+        <div className="bg-gray-800 rounded-lg px-3 py-2 text-center">
+          <p className="text-lg font-bold text-white">{ev.categorias_count}</p>
+          <p className="text-xs text-gray-500">Categorías</p>
+        </div>
+      </div>
+
+      {/* Advertencias */}
+      {ev.advertencias.length > 0 && (
+        <div className="space-y-1">
+          {ev.advertencias.map((adv, i) => (
+            <div key={i} className="flex items-center gap-2 text-xs text-yellow-400 bg-yellow-950/40 border border-yellow-900 rounded-lg px-3 py-1.5">
+              <span className="shrink-0">⚠</span>
+              <span>{adv}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TabPanel() {
+  const { data, isLoading } = useSuperadminDashboard();
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} className="h-16 bg-gray-800 rounded-2xl animate-pulse" />
+          ))}
+        </div>
+        <div className="h-40 bg-gray-800 rounded-2xl animate-pulse" />
+      </div>
+    );
+  }
+
+  const stats = data?.estadisticas;
+  const eventos = data?.eventos ?? [];
+  const eventosHoy = eventos.filter((e) => e.es_hoy);
+  const eventosPróximos = eventos.filter((e) => !e.es_hoy);
+
+  return (
+    <div className="space-y-6">
+      {/* Stats globales */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <StatCard label="Clientes" value={stats?.total_clientes ?? 0} />
+        <StatCard label="Eventos totales" value={stats?.total_eventos ?? 0} />
+        <StatCard label="Portales activos" value={stats?.portales_activos ?? 0} />
+        <StatCard label="Inscripciones" value={stats?.total_inscripciones ?? 0} />
+        <StatCard label="Full Pass aprobados" value={stats?.full_pass_aprobados ?? 0} />
+        <StatCard
+          label="Total cobrado"
+          value={`$${parseFloat(stats?.total_cobrado ?? "0").toFixed(2)}`}
+        />
+      </div>
+
+      {/* Eventos de hoy */}
+      {eventosHoy.length > 0 && (
+        <div>
+          <h2 className="text-sm font-semibold text-indigo-400 uppercase tracking-wide mb-3">
+            Eventos hoy ({eventosHoy.length})
+          </h2>
+          <div className="space-y-3">
+            {eventosHoy.map((ev) => <EventoRow key={ev.id} ev={ev} />)}
+          </div>
+        </div>
+      )}
+
+      {/* Próximos 7 días */}
+      {eventosPróximos.length > 0 && (
+        <div>
+          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-3">
+            Próximos 7 días ({eventosPróximos.length})
+          </h2>
+          <div className="space-y-3">
+            {eventosPróximos.map((ev) => <EventoRow key={ev.id} ev={ev} />)}
+          </div>
+        </div>
+      )}
+
+      {eventos.length === 0 && (
+        <div className="text-center py-20 text-gray-600">
+          <p className="text-lg">No hay eventos activos ni próximos esta semana.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Página principal ─────────────────────────────────────────────────────────
 
-type Tab = "clientes" | "configuracion";
+type Tab = "panel" | "clientes" | "configuracion";
 
 export default function SuperadminPage() {
-  const [tab, setTab] = useState<Tab>("clientes");
+  const [tab, setTab] = useState<Tab>("panel");
 
   const tabs: { id: Tab; label: string }[] = [
+    { id: "panel",         label: "Panel" },
     { id: "clientes",      label: "Clientes" },
-    { id: "configuracion", label: "Configuración general" },
+    { id: "configuracion", label: "Configuración" },
   ];
 
   return (
@@ -626,6 +790,7 @@ export default function SuperadminPage() {
         ))}
       </div>
 
+      {tab === "panel"         && <TabPanel />}
       {tab === "clientes"      && <TabClientes />}
       {tab === "configuracion" && <TabConfiguracion />}
     </div>

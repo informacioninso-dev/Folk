@@ -472,6 +472,111 @@ class HealthCheckView(APIView):
         return Response({"status": "ok"})
 
 
+# ─── Superadmin Dashboard ─────────────────────────────────────────────────────
+
+class SuperadminDashboardView(APIView):
+    permission_classes = [IsAdminUser]
+
+    def get(self, request):
+        from django.utils import timezone
+        from django.db.models import Count, Q, Sum
+
+        today = timezone.localdate()
+        proximos_dias = today + timezone.timedelta(days=7)
+
+        # Eventos activos (portal_activo) o que ocurren hoy/próximos 7 días
+        eventos_qs = (
+            Evento.objects
+            .select_related("organizador")
+            .prefetch_related("categorias_ritmo")
+            .filter(
+                Q(portal_activo=True) |
+                Q(fecha__gte=today, fecha__lte=proximos_dias)
+            )
+            .order_by("fecha")
+        )
+
+        eventos_data = []
+        for ev in eventos_qs:
+            inscripciones_total = Inscripcion.objects.filter(
+                categoria_ritmo__evento=ev
+            ).count()
+            full_pass_pendientes = PagoFullPass.objects.filter(
+                evento=ev, estado="pendiente"
+            ).count()
+            full_pass_aprobados = PagoFullPass.objects.filter(
+                evento=ev, estado="aprobado"
+            ).count()
+            categorias_count = ev.categorias_ritmo.count()
+            tiene_full_pass = hasattr(ev, "full_pass_config")
+            try:
+                tiene_full_pass = ev.full_pass_config is not None
+            except Exception:
+                tiene_full_pass = False
+
+            # Advertencias automáticas
+            advertencias = []
+            if ev.portal_activo and not tiene_full_pass:
+                advertencias.append("Portal activo sin Full Pass configurado")
+            if ev.portal_activo and categorias_count == 0:
+                advertencias.append("Portal activo sin categorías")
+            if full_pass_pendientes > 0:
+                advertencias.append(f"{full_pass_pendientes} pago(s) de Full Pass pendientes")
+            # Pagos de categorías pendientes hace más de 48h
+            from django.utils.timezone import now as tz_now
+            cutoff = tz_now() - timezone.timedelta(hours=48)
+            pagos_cat_pendientes = PagoCategoria.objects.filter(
+                inscripcion__categoria_ritmo__evento=ev,
+                estado="pendiente",
+                created_at__lt=cutoff,
+            ).count()
+            if pagos_cat_pendientes > 0:
+                advertencias.append(f"{pagos_cat_pendientes} pago(s) de categoría sin revisar >48h")
+
+            es_hoy = ev.fecha == today
+
+            eventos_data.append({
+                "id": ev.id,
+                "nombre": ev.nombre,
+                "fecha": str(ev.fecha),
+                "es_hoy": es_hoy,
+                "ubicacion": ev.ubicacion,
+                "organizador_id": ev.organizador_id,
+                "organizador_nombre": ev.organizador.nombre,
+                "portal_activo": ev.portal_activo,
+                "pago_folk_confirmado": ev.pago_folk_confirmado,
+                "inscripciones_total": inscripciones_total,
+                "full_pass_pendientes": full_pass_pendientes,
+                "full_pass_aprobados": full_pass_aprobados,
+                "categorias_count": categorias_count,
+                "advertencias": advertencias,
+            })
+
+        # Estadísticas globales
+        total_eventos = Evento.objects.count()
+        total_portales_activos = Evento.objects.filter(portal_activo=True).count()
+        total_inscripciones = Inscripcion.objects.count()
+        total_full_pass_aprobados = PagoFullPass.objects.filter(estado="aprobado").count()
+        total_clientes = Organizador.objects.count()
+        total_cobrado = (
+            Evento.objects
+            .filter(pago_folk_confirmado=True, monto_folk__isnull=False)
+            .aggregate(total=Sum("monto_folk"))["total"] or 0
+        )
+
+        return Response({
+            "eventos": eventos_data,
+            "estadisticas": {
+                "total_eventos": total_eventos,
+                "portales_activos": total_portales_activos,
+                "total_inscripciones": total_inscripciones,
+                "full_pass_aprobados": total_full_pass_aprobados,
+                "total_clientes": total_clientes,
+                "total_cobrado": str(total_cobrado),
+            },
+        })
+
+
 class EventoViewSet(viewsets.ModelViewSet):
     queryset = Evento.objects.select_related("organizador").all()
     serializer_class = EventoSerializer

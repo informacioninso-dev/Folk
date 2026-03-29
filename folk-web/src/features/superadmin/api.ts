@@ -1,5 +1,5 @@
 import { apiClient } from "@/lib/api-client";
-import type { OrganizadorDetalle, CrearClientePayload, SiteConfig } from "./types";
+import type { OrganizadorDetalle, CrearClientePayload, SiteConfig, DashboardData } from "./types";
 import type { Evento } from "@/features/eventos/types";
 
 export const superadminApi = {
@@ -48,4 +48,12 @@ export const superadminApi = {
 
   updateSiteConfig: (data: Partial<SiteConfig>) =>
     apiClient.patch<SiteConfig>("/site-config/", data).then((r) => r.data),
+
+  getDashboard: () =>
+    apiClient.get<DashboardData>("/superadmin/dashboard/").then((r) => r.data),
+
+  updateNotasInternas: (organizadorId: number, notas_internas: string) =>
+    apiClient
+      .patch<OrganizadorDetalle>(`/organizadores/${organizadorId}/`, { notas_internas })
+      .then((r) => r.data),
 };

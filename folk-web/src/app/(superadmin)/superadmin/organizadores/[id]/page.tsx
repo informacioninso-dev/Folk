@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useOrganizador, useEventosDeOrganizador, useRegistrarPagoEvento, useSetLimiteEventos } from "@/features/superadmin/hooks";
+import { useOrganizador, useEventosDeOrganizador, useRegistrarPagoEvento, useSetLimiteEventos, useUpdateNotasInternas } from "@/features/superadmin/hooks";
 import type { Evento } from "@/features/eventos/types";
 
 // ─── Tarjeta de evento con gestión de pago ────────────────────────────────────
@@ -70,6 +70,17 @@ function EventoCard({ evento, organizadorId }: { evento: Evento; organizadorId: 
         </div>
       </div>
 
+      {/* Acceso directo al panel del evento */}
+      <div className="border-t border-gray-100 px-5 py-2.5 bg-indigo-50/60 flex items-center justify-between gap-2">
+        <span className="text-xs text-indigo-500 font-medium">Acceso directo</span>
+        <Link
+          href={`/eventos/${evento.id}`}
+          className="text-xs text-indigo-600 hover:text-indigo-800 font-semibold transition flex items-center gap-1"
+        >
+          Abrir panel del evento →
+        </Link>
+      </div>
+
       {/* Detalle de pago */}
       <div className="border-t border-gray-100 px-5 py-3 bg-gray-50 flex items-center justify-between gap-4">
         {!editando ? (
@@ -129,8 +140,12 @@ export default function OrganizadorDetallePage() {
   const { data: org, isLoading: loadingOrg } = useOrganizador(id);
   const { data: eventos, isLoading: loadingEventos } = useEventosDeOrganizador(id);
   const limiteMutation = useSetLimiteEventos();
+  const notasMutation = useUpdateNotasInternas(id);
   const [editandoLimite, setEditandoLimite] = useState(false);
   const [nuevoLimite, setNuevoLimite] = useState("");
+  const [editandoNotas, setEditandoNotas] = useState(false);
+  const [notas, setNotas] = useState("");
+  const [notasGuardadas, setNotasGuardadas] = useState(false);
 
   const total       = eventos?.length ?? 0;
   const activos     = eventos?.filter((e) => e.activo).length ?? 0;
@@ -224,6 +239,66 @@ export default function OrganizadorDetallePage() {
           <Stat label="Pagos pendientes" value={pendientes} color={pendientes > 0 ? "orange" : "gray"} />
           <Stat label="Total cobrado" value={`$${totalCobrado.toFixed(2)}`} color="orange" />
         </div>
+      </div>
+
+      {/* Notas internas */}
+      <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h2 className="text-base font-bold text-gray-900">Notas internas</h2>
+            <p className="text-xs text-gray-400 mt-0.5">Visibles solo para el equipo Folk</p>
+          </div>
+          {!editandoNotas && (
+            <button
+              onClick={() => { setNotas(org.notas_internas ?? ""); setEditandoNotas(true); setNotasGuardadas(false); }}
+              className="text-xs text-orange-500 hover:text-orange-700 font-medium transition"
+            >
+              {org.notas_internas ? "Editar" : "+ Agregar nota"}
+            </button>
+          )}
+        </div>
+
+        {!editandoNotas ? (
+          org.notas_internas ? (
+            <p className="text-sm text-gray-700 whitespace-pre-wrap">{org.notas_internas}</p>
+          ) : (
+            <p className="text-sm text-gray-400 italic">Sin notas. Haz clic en Agregar nota para escribir algo.</p>
+          )
+        ) : (
+          <div className="space-y-3">
+            <textarea
+              value={notas}
+              onChange={(e) => setNotas(e.target.value)}
+              rows={4}
+              placeholder="Ej: Cliente pagó por transferencia el 15 de enero. Prefiere contacto por email..."
+              className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-300 transition resize-none"
+            />
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => {
+                  notasMutation.mutate(notas, {
+                    onSuccess: () => {
+                      setEditandoNotas(false);
+                      setNotasGuardadas(true);
+                      setTimeout(() => setNotasGuardadas(false), 2500);
+                    },
+                  });
+                }}
+                disabled={notasMutation.isPending}
+                className="px-4 py-1.5 bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold rounded-lg transition disabled:opacity-50"
+              >
+                {notasMutation.isPending ? "Guardando…" : "Guardar"}
+              </button>
+              <button
+                onClick={() => setEditandoNotas(false)}
+                className="text-xs text-gray-400 hover:text-gray-600 transition"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
+        {notasGuardadas && <p className="text-xs text-green-600 mt-2">✓ Guardado</p>}
       </div>
 
       {/* Eventos */}

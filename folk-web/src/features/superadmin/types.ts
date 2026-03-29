@@ -5,8 +5,40 @@ export interface OrganizadorDetalle {
   nombre: string;
   nit_ruc: string;
   email_contacto: string;
+  notas_internas: string;
   max_eventos: number;
   created_at: string;
+}
+
+export interface DashboardEvento {
+  id: number;
+  nombre: string;
+  fecha: string;
+  es_hoy: boolean;
+  ubicacion: string;
+  organizador_id: number;
+  organizador_nombre: string;
+  portal_activo: boolean;
+  pago_folk_confirmado: boolean;
+  inscripciones_total: number;
+  full_pass_pendientes: number;
+  full_pass_aprobados: number;
+  categorias_count: number;
+  advertencias: string[];
+}
+
+export interface DashboardStats {
+  total_eventos: number;
+  portales_activos: number;
+  total_inscripciones: number;
+  full_pass_aprobados: number;
+  total_clientes: number;
+  total_cobrado: string;
+}
+
+export interface DashboardData {
+  eventos: DashboardEvento[];
+  estadisticas: DashboardStats;
 }
 
 export interface SiteConfig {

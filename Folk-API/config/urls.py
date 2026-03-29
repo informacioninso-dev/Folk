@@ -13,6 +13,7 @@ from competition.views import (
     BloqueHorarioViewSet,
     SiteConfigView,
     BuscarParticipanteView,
+    SuperadminDashboardView,
     CalificacionViewSet,
     CategoriaRitmoViewSet,
     CronogramaLiveView,
@@ -122,4 +123,6 @@ urlpatterns = [
     path("api/v1/eventos/<int:pk>/estadisticas/", EventoEstadisticasView.as_view(), name="evento_estadisticas"),
     # Configuración global del sitio
     path("api/v1/site-config/", SiteConfigView.as_view(), name="site_config"),
+    # Dashboard superadmin
+    path("api/v1/superadmin/dashboard/", SuperadminDashboardView.as_view(), name="superadmin_dashboard"),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

@@ -41,6 +41,9 @@ class Organizador(BaseModel):
                                         help_text="Número en formato internacional, ej: 593999999999")
     whatsapp_mensaje = models.CharField(max_length=300, blank=True, default="",
                                         help_text="Mensaje predeterminado al abrir el chat")
+    # Notas internas Folk (solo visibles para superadmin)
+    notas_internas = models.TextField(blank=True, default="",
+                                      help_text="Notas privadas del equipo Folk sobre este cliente")
     # Límite de eventos (Fase 1: cobro por evento)
     max_eventos    = models.PositiveIntegerField(default=1)
     # Equipo: usuarios adicionales con acceso al panel

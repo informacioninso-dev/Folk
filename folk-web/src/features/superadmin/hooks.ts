@@ -80,6 +80,25 @@ export function useUpdateSiteConfig() {
   });
 }
 
+export function useSuperadminDashboard() {
+  return useQuery({
+    queryKey: ["sa", "dashboard"] as const,
+    queryFn: superadminApi.getDashboard,
+    refetchInterval: 60_000, // auto-refresh each minute
+  });
+}
+
+export function useUpdateNotasInternas(organizadorId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (notas: string) => superadminApi.updateNotasInternas(organizadorId, notas),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["sa", "organizadores", organizadorId] });
+      qc.invalidateQueries({ queryKey: ["sa", "organizadores"] });
+    },
+  });
+}
+
 export function useRegistrarPagoEvento(organizadorId: number) {
   const qc = useQueryClient();
   return useMutation({
