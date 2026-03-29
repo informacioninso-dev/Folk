@@ -64,7 +64,8 @@ function toProxyResponse(response: Response) {
 }
 
 async function handleRequest(request: NextRequest, context: RouteContext) {
-  const path = context.params.path.join("/");
+  const rawPath = context.params.path.join("/");
+  const path = rawPath.endsWith("/") ? rawPath : `${rawPath}/`;
   const backendUrl = getBackendApiUrl(`/api/v1/${path}${request.nextUrl.search}`);
   const body = await getForwardBody(request);
 

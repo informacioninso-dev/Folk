@@ -1272,6 +1272,7 @@ class RankingPublicoView(APIView):
 
 
 class UploadView(MethodScopedThrottleMixin, APIView):
+    authentication_classes = []
     permission_classes = [AllowAny]
     throttle_scope_map = {"post": "upload_public"}
 
@@ -1298,6 +1299,7 @@ class UploadView(MethodScopedThrottleMixin, APIView):
 
 
 class RegistroGeneralPublicoView(MethodScopedThrottleMixin, APIView):
+    authentication_classes = []
     permission_classes = [AllowAny]
     throttle_scope_map = {"post": "public_registration"}
 
@@ -1410,6 +1412,7 @@ class CronogramaLiveView(APIView):
 # ─── Recuperar contraseña ─────────────────────────────────────────────────────
 
 class PasswordResetView(MethodScopedThrottleMixin, APIView):
+    authentication_classes = []
     permission_classes = [AllowAny]
     throttle_scope_map = {"post": "password_reset"}
 
@@ -1440,6 +1443,7 @@ class PasswordResetView(MethodScopedThrottleMixin, APIView):
 
 
 class PasswordResetConfirmView(MethodScopedThrottleMixin, APIView):
+    authentication_classes = []
     permission_classes = [AllowAny]
     throttle_scope_map = {"post": "password_reset_confirm"}
 
@@ -1567,6 +1571,7 @@ class FullPassConfigViewSet(viewsets.ModelViewSet):
 # ─── Pago Full Pass — portal público ─────────────────────────────────────────
 
 class PagoFullPassPublicoView(MethodScopedThrottleMixin, APIView):
+    authentication_classes = []
     permission_classes = [AllowAny]
     throttle_scope_map = {"get": "portal_lookup", "post": "portal_submit"}
 
@@ -1662,6 +1667,7 @@ class PagoFullPassAdminViewSet(viewsets.ModelViewSet):
 # ─── Registro de categorías (requiere Full Pass aprobado) ─────────────────────
 
 class RegistroCategoriaPublicoView(MethodScopedThrottleMixin, APIView):
+    authentication_classes = []
     permission_classes = [AllowAny]
     throttle_scope_map = {"get": "portal_lookup", "post": "portal_submit"}
 
