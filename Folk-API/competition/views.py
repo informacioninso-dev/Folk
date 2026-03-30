@@ -8,9 +8,10 @@ from django.core.files.storage import FileSystemStorage
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.contrib.auth import get_user_model
 from django.contrib.auth.tokens import default_token_generator
-from django.core.mail import send_mail, get_connection
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
+from django.utils.decorators import method_decorator
+from django.views.decorators.cache import cache_page
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
@@ -43,10 +44,12 @@ from .models import (
     ParticipanteGeneral,
     Ranking,
 )
+from .emailing import folk_send_mail
 from .query_helpers import get_inscripciones_for_cedula
 from .serializers import (
     BloqueHorarioSerializer,
     SiteConfigSerializer,
+    SiteConfigPublicSerializer,
     CalificacionSerializer,
     CategoriaRitmoSerializer,
     CriterioEvaluacionSerializer,
@@ -80,38 +83,6 @@ from .serializers import (
 )
 
 
-# ─── Email helpers ───────────────────────────────────────────────────────────
-
-def _get_email_connection_and_from():
-    """Returns (connection, from_email) using SiteConfig if configured, else None/default."""
-    config = SiteConfig.get()
-    if config.email_host:
-        conn = get_connection(
-            host=config.email_host,
-            port=config.email_port,
-            username=config.email_host_user,
-            password=config.email_host_password,
-            use_tls=config.email_use_tls,
-            fail_silently=False,
-        )
-        from_email = config.email_from or config.email_host_user or settings.DEFAULT_FROM_EMAIL
-        return conn, from_email
-    return None, settings.DEFAULT_FROM_EMAIL
-
-
-def folk_send_mail(subject, message, recipient_list, html_message=None):
-    connection, from_email = _get_email_connection_and_from()
-    send_mail(
-        subject=subject,
-        message=message,
-        from_email=from_email,
-        recipient_list=recipient_list,
-        html_message=html_message,
-        connection=connection,
-        fail_silently=False,
-    )
-
-
 # ─── JWT personalizado con claims extra ──────────────────────────────────────
 
 class FolkTokenObtainPairSerializer(TokenObtainPairSerializer):
@@ -120,10 +91,8 @@ class FolkTokenObtainPairSerializer(TokenObtainPairSerializer):
         token = super().get_token(user)
         token["is_staff"] = user.is_staff
         token["email"] = user.email
-        try:
-            token["organizador_id"] = user.organizador.id
-        except Exception:
-            token["organizador_id"] = None
+        org = _get_organizador(user)
+        token["organizador_id"] = org.id if org else None
         # Participante claim
         participante_ids = list(
             user.participaciones.values_list("id", flat=True)
@@ -136,6 +105,8 @@ class FolkTokenObtainPairSerializer(TokenObtainPairSerializer):
 
 class FolkTokenObtainPairView(TokenObtainPairView):
     serializer_class = FolkTokenObtainPairSerializer
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "auth_login"
 
 
 # ─── /me/ ────────────────────────────────────────────────────────────────────
@@ -145,11 +116,8 @@ class MeView(APIView):
 
     def get(self, request):
         user = request.user
-        organizador_id = None
-        try:
-            organizador_id = user.organizador.id
-        except Exception:
-            pass
+        org = _get_organizador(user)
+        organizador_id = org.id if org else None
         participaciones = list(
             user.participaciones.select_related("evento").values(
                 "id", "nombre_completo", "estado",
@@ -321,6 +289,7 @@ def _validate_public_upload(file, kind):
 class OrganizadorViewSet(viewsets.ModelViewSet):
     queryset = Organizador.objects.select_related("usuario").all()
     permission_classes = [IsAuthenticated]
+    pagination_max_page_size = 100
 
     def get_serializer_class(self):
         if self.action == "crear_cliente":
@@ -591,36 +560,82 @@ class SuperadminDashboardView(APIView):
 
         today = timezone.localdate()
         proximos_dias = today + timezone.timedelta(days=7)
+        cutoff = timezone.now() - timezone.timedelta(hours=48)
 
         # Eventos activos (portal_activo) o que ocurren hoy/próximos 7 días
         eventos_qs = (
             Evento.objects
             .select_related("organizador")
-            .prefetch_related("categorias_ritmo")
             .filter(
                 Q(portal_activo=True) |
                 Q(fecha__gte=today, fecha__lte=proximos_dias)
             )
+            .annotate(categorias_count=Count("categorias_ritmo", distinct=True))
             .order_by("fecha")
         )
+        eventos = list(eventos_qs)
+        eventos_ids = [ev.id for ev in eventos]
+
+        inscripciones_por_evento = {}
+        full_pass_pendientes_por_evento = {}
+        full_pass_aprobados_por_evento = {}
+        pagos_categoria_pendientes_por_evento = {}
+        eventos_con_full_pass = set()
+
+        if eventos_ids:
+            inscripciones_por_evento = {
+                row["categoria_ritmo__evento_id"]: row["total"]
+                for row in (
+                    Inscripcion.objects
+                    .filter(categoria_ritmo__evento_id__in=eventos_ids)
+                    .values("categoria_ritmo__evento_id")
+                    .annotate(total=Count("id"))
+                )
+            }
+            full_pass_pendientes_por_evento = {
+                row["evento_id"]: row["total"]
+                for row in (
+                    PagoFullPass.objects
+                    .filter(evento_id__in=eventos_ids, estado="pendiente")
+                    .values("evento_id")
+                    .annotate(total=Count("id"))
+                )
+            }
+            full_pass_aprobados_por_evento = {
+                row["evento_id"]: row["total"]
+                for row in (
+                    PagoFullPass.objects
+                    .filter(evento_id__in=eventos_ids, estado="aprobado")
+                    .values("evento_id")
+                    .annotate(total=Count("id"))
+                )
+            }
+            pagos_categoria_pendientes_por_evento = {
+                row["inscripcion__categoria_ritmo__evento_id"]: row["total"]
+                for row in (
+                    PagoCategoria.objects
+                    .filter(
+                        inscripcion__categoria_ritmo__evento_id__in=eventos_ids,
+                        estado="pendiente",
+                        created_at__lt=cutoff,
+                    )
+                    .values("inscripcion__categoria_ritmo__evento_id")
+                    .annotate(total=Count("id"))
+                )
+            }
+            eventos_con_full_pass = set(
+                FullPassConfig.objects
+                .filter(evento_id__in=eventos_ids)
+                .values_list("evento_id", flat=True)
+            )
 
         eventos_data = []
-        for ev in eventos_qs:
-            inscripciones_total = Inscripcion.objects.filter(
-                categoria_ritmo__evento=ev
-            ).count()
-            full_pass_pendientes = PagoFullPass.objects.filter(
-                evento=ev, estado="pendiente"
-            ).count()
-            full_pass_aprobados = PagoFullPass.objects.filter(
-                evento=ev, estado="aprobado"
-            ).count()
-            categorias_count = ev.categorias_ritmo.count()
-            tiene_full_pass = hasattr(ev, "full_pass_config")
-            try:
-                tiene_full_pass = ev.full_pass_config is not None
-            except Exception:
-                tiene_full_pass = False
+        for ev in eventos:
+            inscripciones_total = inscripciones_por_evento.get(ev.id, 0)
+            full_pass_pendientes = full_pass_pendientes_por_evento.get(ev.id, 0)
+            full_pass_aprobados = full_pass_aprobados_por_evento.get(ev.id, 0)
+            categorias_count = getattr(ev, "categorias_count", 0)
+            tiene_full_pass = ev.id in eventos_con_full_pass
 
             # Advertencias automáticas
             advertencias = []
@@ -631,13 +646,7 @@ class SuperadminDashboardView(APIView):
             if full_pass_pendientes > 0:
                 advertencias.append(f"{full_pass_pendientes} pago(s) de Full Pass pendientes")
             # Pagos de categorías pendientes hace más de 48h
-            from django.utils.timezone import now as tz_now
-            cutoff = tz_now() - timezone.timedelta(hours=48)
-            pagos_cat_pendientes = PagoCategoria.objects.filter(
-                inscripcion__categoria_ritmo__evento=ev,
-                estado="pendiente",
-                created_at__lt=cutoff,
-            ).count()
+            pagos_cat_pendientes = pagos_categoria_pendientes_por_evento.get(ev.id, 0)
             if pagos_cat_pendientes > 0:
                 advertencias.append(f"{pagos_cat_pendientes} pago(s) de categoría sin revisar >48h")
 
@@ -689,6 +698,7 @@ class EventoViewSet(viewsets.ModelViewSet):
     queryset = Evento.objects.select_related("organizador").all()
     serializer_class = EventoSerializer
     permission_classes = [IsAuthenticated]
+    pagination_max_page_size = 100
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -703,20 +713,32 @@ class EventoViewSet(viewsets.ModelViewSet):
         return qs.filter(jueces__usuario=self.request.user)
 
     def create(self, request, *args, **kwargs):
-        if not request.user.is_staff:
-            org = _get_organizador(request.user)
-            if not org:
-                return Response(
-                    {"detail": "Solo organizadores o staff pueden crear eventos."},
-                    status=status.HTTP_403_FORBIDDEN,
-                )
-            actuales = Evento.objects.filter(organizador=org).count()
-            if actuales >= org.max_eventos:
-                return Response(
-                    {"detail": f"Límite de {org.max_eventos} evento(s) alcanzado. Contacta a Folk para ampliar tu plan."},
-                    status=status.HTTP_403_FORBIDDEN,
-                )
-        return super().create(request, *args, **kwargs)
+        if request.user.is_staff:
+            return super().create(request, *args, **kwargs)
+
+        org = _get_organizador(request.user)
+        if not org:
+            return Response(
+                {"detail": "Solo organizadores o staff pueden crear eventos."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        actuales = Evento.objects.filter(organizador=org).count()
+        if actuales >= org.max_eventos:
+            return Response(
+                {"detail": f"Límite de {org.max_eventos} evento(s) alcanzado. Contacta a Folk para ampliar tu plan."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        # EventoSerializer incluye validadores de unicidad que usan "organizador".
+        # En cuentas no staff lo inyectamos antes de validar.
+        data = request.data.copy()
+        data["organizador"] = org.id
+        serializer = self.get_serializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
     def perform_create(self, serializer):
         if self.request.user.is_staff:
@@ -899,6 +921,7 @@ class CategoriaRitmoViewSet(viewsets.ModelViewSet):
     queryset = CategoriaRitmo.objects.select_related("evento").all()
     serializer_class = CategoriaRitmoSerializer
     permission_classes = [IsAuthenticated]
+    pagination_max_page_size = 150
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -950,6 +973,7 @@ class InscripcionViewSet(viewsets.ModelViewSet):
     ).prefetch_related("participantes").all()
     serializer_class = InscripcionSerializer
     permission_classes = [IsAuthenticated]
+    pagination_max_page_size = 200
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -1012,6 +1036,7 @@ class ParticipanteViewSet(viewsets.ModelViewSet):
     queryset = Participante.objects.select_related("inscripcion").all()
     serializer_class = ParticipanteSerializer
     permission_classes = [IsAuthenticated]
+    pagination_max_page_size = 250
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -1043,6 +1068,7 @@ class JuezViewSet(viewsets.ModelViewSet):
     queryset = Juez.objects.select_related("usuario", "evento").prefetch_related("categorias").all()
     serializer_class = JuezSerializer
     permission_classes = [IsAuthenticated]
+    pagination_max_page_size = 100
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -1121,6 +1147,7 @@ class CriterioEvaluacionViewSet(viewsets.ModelViewSet):
     queryset = CriterioEvaluacion.objects.select_related("evento").all()
     serializer_class = CriterioEvaluacionSerializer
     permission_classes = [IsAuthenticated]
+    pagination_max_page_size = 100
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -1152,6 +1179,7 @@ class CalificacionViewSet(viewsets.ModelViewSet):
     ).all()
     serializer_class = CalificacionSerializer
     permission_classes = [IsAuthenticated]
+    pagination_max_page_size = 300
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -1245,6 +1273,7 @@ class ParticipanteGeneralViewSet(viewsets.ModelViewSet):
     queryset = ParticipanteGeneral.objects.select_related("evento").all()
     serializer_class = ParticipanteGeneralSerializer
     permission_classes = [IsAuthenticated]
+    pagination_max_page_size = 250
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -1317,6 +1346,8 @@ class ParticipanteGeneralViewSet(viewsets.ModelViewSet):
                     message=(
                         f"Hola {participante.nombre_completo},\n\n"
                         f"Tu registro para '{participante.evento.nombre}' ha sido aprobado.\n\n"
+                        f"Organizador: {participante.evento.organizador.nombre}\n"
+                        f"Contacto del organizador: {participante.evento.organizador.email_contacto}\n\n"
                         f"Ya puedes ingresar al portal de participantes:\n"
                         f"{frontend_url}/login\n\n"
                         f"  Usuario: {participante.cedula}\n"
@@ -1348,6 +1379,7 @@ class GrupoViewSet(viewsets.ModelViewSet):
     queryset = Grupo.objects.prefetch_related("participantes").all()
     serializer_class = GrupoSerializer
     permission_classes = [IsAuthenticated]
+    pagination_max_page_size = 250
 
     def get_queryset(self):
         return _scope_queryset_to_event(
@@ -1375,6 +1407,7 @@ class ParejaViewSet(viewsets.ModelViewSet):
     queryset = Pareja.objects.select_related("participante_1", "participante_2").all()
     serializer_class = ParejaSerializer
     permission_classes = [IsAuthenticated]
+    pagination_max_page_size = 250
 
     def get_queryset(self):
         return _scope_queryset_to_event(
@@ -1404,6 +1437,7 @@ class RankingViewSet(viewsets.ModelViewSet):
     queryset = Ranking.objects.select_related("evento").all()
     serializer_class = RankingSerializer
     permission_classes = [IsAuthenticated]
+    pagination_max_page_size = 100
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -1447,6 +1481,7 @@ class CronogramaViewSet(viewsets.ModelViewSet):
     queryset = Cronograma.objects.select_related("evento").prefetch_related("items").all()
     serializer_class = CronogramaSerializer
     permission_classes = [IsAuthenticated]
+    pagination_max_page_size = 100
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -1473,6 +1508,7 @@ class ItemCronogramaViewSet(viewsets.ModelViewSet):
     queryset = ItemCronograma.objects.select_related("inscripcion", "cronograma").all()
     serializer_class = ItemCronogramaSerializer
     permission_classes = [IsAuthenticated]
+    pagination_max_page_size = 300
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -1838,7 +1874,11 @@ class SiteConfigView(APIView):
 
     def get(self, request):
         config = SiteConfig.get()
-        return Response(SiteConfigSerializer(config).data)
+        if request.user.is_authenticated and request.user.is_staff:
+            serializer = SiteConfigSerializer(config)
+        else:
+            serializer = SiteConfigPublicSerializer(config)
+        return Response(serializer.data)
 
     def patch(self, request):
         config = SiteConfig.get()
@@ -1848,8 +1888,39 @@ class SiteConfigView(APIView):
         return Response(serializer.data)
 
 
+class SiteConfigTestEmailView(APIView):
+    permission_classes = [IsAdminUser]
+
+    def post(self, request):
+        destination = (request.data.get("email") or request.user.email or "").strip()
+        if not destination:
+            return Response(
+                {"detail": "Debes indicar un correo destino para la prueba."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            folk_send_mail(
+                subject="Prueba de correo - Folk",
+                message=(
+                    "Este es un correo de prueba enviado desde la configuracion de correo "
+                    "del panel de superadmin en Folk."
+                ),
+                recipient_list=[destination],
+                fail_silently=False,
+            )
+        except Exception as exc:
+            return Response(
+                {"detail": f"No se pudo enviar el correo de prueba: {exc}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return Response({"detail": f"Correo de prueba enviado a {destination}."})
+
+
 # ─── Homepage pública — listado y destacados ──────────────────────────────────
 
+@method_decorator(cache_page(60), name="dispatch")
 class EventosHomepageView(APIView):
     permission_classes = [AllowAny]
 
@@ -1870,6 +1941,7 @@ class EventosHomepageView(APIView):
 
 # ─── Portal público del evento ────────────────────────────────────────────────
 
+@method_decorator(cache_page(60), name="dispatch")
 class EventoPortalView(APIView):
     permission_classes = [AllowAny]
 
@@ -1890,6 +1962,7 @@ class FullPassConfigViewSet(viewsets.ModelViewSet):
     queryset = FullPassConfig.objects.select_related("evento").all()
     serializer_class = FullPassConfigSerializer
     permission_classes = [IsAuthenticated]
+    pagination_max_page_size = 100
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -1966,6 +2039,7 @@ class PagoFullPassAdminViewSet(viewsets.ModelViewSet):
     queryset = PagoFullPass.objects.select_related("evento").all()
     serializer_class = PagoFullPassSerializer
     permission_classes = [IsAuthenticated]
+    pagination_max_page_size = 250
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -2084,6 +2158,7 @@ class PagoCategoriaAdminViewSet(viewsets.ModelViewSet):
     ).all()
     serializer_class = PagoCategoriaSerializer
     permission_classes = [IsAuthenticated]
+    pagination_max_page_size = 250
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -2233,6 +2308,7 @@ class BloqueHorarioViewSet(viewsets.ModelViewSet):
     queryset = BloqueHorario.objects.select_related("evento").all()
     serializer_class = BloqueHorarioSerializer
     permission_classes = [IsAuthenticated]
+    pagination_max_page_size = 250
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -2267,6 +2343,7 @@ class OrdenRitmoAgendaViewSet(viewsets.ModelViewSet):
     queryset = OrdenRitmoAgenda.objects.select_related("evento").all()
     serializer_class = OrdenRitmoAgendaSerializer
     permission_classes = [IsAuthenticated]
+    pagination_max_page_size = 250
 
     def get_queryset(self):
         qs = super().get_queryset()

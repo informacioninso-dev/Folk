@@ -80,6 +80,12 @@ export function useUpdateSiteConfig() {
   });
 }
 
+export function useTestSiteConfigEmail() {
+  return useMutation({
+    mutationFn: (email: string) => superadminApi.testSiteConfigEmail(email),
+  });
+}
+
 export function useEnviarComunicado() {
   return useMutation({
     mutationFn: (data: { asunto: string; mensaje: string; organizador_id?: number | null }) =>

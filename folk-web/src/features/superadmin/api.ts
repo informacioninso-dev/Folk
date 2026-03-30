@@ -49,6 +49,11 @@ export const superadminApi = {
   updateSiteConfig: (data: Partial<SiteConfig>) =>
     apiClient.patch<SiteConfig>("/site-config/", data).then((r) => r.data),
 
+  testSiteConfigEmail: (email: string) =>
+    apiClient
+      .post<{ detail: string }>("/site-config/test-email/", { email })
+      .then((r) => r.data),
+
   getDashboard: () =>
     apiClient.get<DashboardData>("/superadmin/dashboard/").then((r) => r.data),
 

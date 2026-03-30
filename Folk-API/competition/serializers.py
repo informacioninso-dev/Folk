@@ -1270,6 +1270,10 @@ class SiteConfigSerializer(serializers.ModelSerializer):
         write_only=True, required=False, allow_blank=True,
         style={"input_type": "password"},
     )
+    gmail_app_password = serializers.CharField(
+        write_only=True, required=False, allow_blank=True,
+        style={"input_type": "password"},
+    )
 
     class Meta:
         model  = SiteConfig
@@ -1279,16 +1283,31 @@ class SiteConfigSerializer(serializers.ModelSerializer):
             "politica_privacidad_version",
             "politica_privacidad_url",
             "aviso_privacidad_corto",
+            "email_provider",
             "email_host",
             "email_port",
             "email_use_tls",
             "email_host_user",
             "email_host_password",
             "email_from",
+            "gmail_sender_email",
+            "gmail_app_password",
         )
 
 
 # ─── Ranking público por categoría ───────────────────────────────────────────
+
+class SiteConfigPublicSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SiteConfig
+        fields = (
+            "whatsapp_numero",
+            "whatsapp_mensaje",
+            "politica_privacidad_version",
+            "politica_privacidad_url",
+            "aviso_privacidad_corto",
+        )
+
 
 class RankingCategoriaPublicoSerializer(serializers.ModelSerializer):
     """Top 3 de una categoría para el portal público (solo si el ranking está revelado)."""

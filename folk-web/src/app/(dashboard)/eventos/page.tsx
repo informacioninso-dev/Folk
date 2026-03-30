@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useMe } from "@/features/auth/hooks";
 import { useEventos, useCrearEvento } from "@/features/eventos/hooks";
 import type { Evento } from "@/features/eventos/types";
 
@@ -21,11 +20,44 @@ type FormValues = z.infer<typeof schema>;
 
 const inputCls = "w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-900 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent transition";
 
+function extractErrorMessage(err: unknown): string {
+  const fallback = "Error al crear el evento. Intenta de nuevo.";
+  const maybe = err as {
+    message?: string;
+    response?: { status?: number; data?: unknown };
+  };
+  const data = maybe.response?.data;
+
+  if (typeof data === "string" && data.trim()) return data;
+
+  if (data && typeof data === "object") {
+    const record = data as Record<string, unknown>;
+    if (typeof record.detail === "string" && record.detail.trim()) {
+      return record.detail;
+    }
+
+    for (const value of Object.values(record)) {
+      if (typeof value === "string" && value.trim()) return value;
+      if (Array.isArray(value)) {
+        const first = value.find((item) => typeof item === "string" && item.trim()) as string | undefined;
+        if (first) return first;
+      }
+    }
+  }
+
+  if (typeof maybe.message === "string" && maybe.message.trim()) {
+    return maybe.message;
+  }
+  if (maybe.response?.status) {
+    return `No se pudo crear el evento (HTTP ${maybe.response.status}).`;
+  }
+  return fallback;
+}
+
 // ─── Modal nuevo evento ───────────────────────────────────────────────────────
 
 function NuevoEventoModal({ onClose }: { onClose: () => void }) {
   const crearMutation = useCrearEvento();
-  const { data: me } = useMe();
   const { register, handleSubmit, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: { activo: false },
@@ -34,15 +66,11 @@ function NuevoEventoModal({ onClose }: { onClose: () => void }) {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const onSubmit = (values: FormValues) => {
-    if (!me?.organizador_id) return;
     setErrorMsg(null);
     crearMutation.mutate(values, {
       onSuccess: onClose,
       onError: (err: unknown) => {
-        const msg =
-          (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-          ?? "Error al crear el evento. Intenta de nuevo.";
-        setErrorMsg(msg);
+        setErrorMsg(extractErrorMessage(err));
       },
     });
   };

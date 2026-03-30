@@ -1,4 +1,5 @@
 from pathlib import Path
+from urllib.parse import urlparse, urlunparse
 
 import environ
 
@@ -12,6 +13,7 @@ env = environ.Env(
     CSRF_TRUSTED_ORIGINS=(list, []),
     CELERY_BROKER_URL=(str, "redis://localhost:6379/0"),
     CELERY_RESULT_BACKEND=(str, "redis://localhost:6379/1"),
+    REDIS_CACHE_URL=(str, ""),
     DEFAULT_FROM_EMAIL=(str, "no-reply@folk.local"),
     EMAIL_BACKEND=(str, "django.core.mail.backends.console.EmailBackend"),
     EMAIL_HOST=(str, ""),
@@ -144,7 +146,9 @@ REST_FRAMEWORK = {
         "agenda_lookup": "30/hour",
         "password_reset": "10/hour",
         "password_reset_confirm": "20/hour",
+        "auth_login": "30/hour",
     },
+    "DEFAULT_PAGINATION_CLASS": "competition.pagination.FolkPageNumberPagination",
 }
 
 from datetime import timedelta
@@ -196,3 +200,38 @@ CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = TIME_ZONE
+
+
+def _derive_cache_url_from_broker() -> str:
+    broker_url = env("CELERY_BROKER_URL")
+    parsed = urlparse(broker_url)
+    if parsed.scheme.startswith("redis"):
+        db_segment = (parsed.path or "/0").strip("/")
+        db_number = int(db_segment) if db_segment.isdigit() else 0
+        cache_db_number = db_number + 2
+        return urlunparse(parsed._replace(path=f"/{cache_db_number}"))
+    raise ValueError("CELERY_BROKER_URL no es Redis")
+
+
+redis_cache_url = env("REDIS_CACHE_URL")
+if not redis_cache_url and not DEBUG:
+    try:
+        redis_cache_url = _derive_cache_url_from_broker()
+    except Exception:
+        redis_cache_url = ""
+
+if redis_cache_url:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": redis_cache_url,
+        }
+    }
+else:
+    # Fallback seguro para desarrollo local sin Redis.
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "folk-local-cache",
+        }
+    }

@@ -71,6 +71,7 @@ export interface SiteConfig {
   politica_privacidad_version: string;
   politica_privacidad_url: string;
   aviso_privacidad_corto: string;
+  email_provider: "smtp" | "gmail_app";
   email_host: string;
   email_port: number;
   email_use_tls: boolean;
@@ -78,6 +79,9 @@ export interface SiteConfig {
   /** Write-only: not returned by the API */
   email_host_password?: string;
   email_from: string;
+  gmail_sender_email: string;
+  /** Write-only: not returned by the API */
+  gmail_app_password?: string;
 }
 
 export interface CrearClientePayload {

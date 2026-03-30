@@ -2,7 +2,7 @@ import axios from "axios";
 
 // Cliente sin auth para endpoints públicos
 const publicClient = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL + "/api/v1",
+  baseURL: "/api/proxy",
   headers: { "Content-Type": "application/json" },
 });
 

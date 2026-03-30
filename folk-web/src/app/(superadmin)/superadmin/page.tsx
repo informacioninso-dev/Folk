@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -12,10 +12,11 @@ import {
   useResetPassword,
   useSiteConfig,
   useUpdateSiteConfig,
+  useTestSiteConfigEmail,
   useSuperadminDashboard,
   useEnviarComunicado,
 } from "@/features/superadmin/hooks";
-import type { OrganizadorDetalle, DashboardEvento, DashboardStats } from "@/features/superadmin/types";
+import type { OrganizadorDetalle, DashboardEvento } from "@/features/superadmin/types";
 
 // ─── Schema ───────────────────────────────────────────────────────────────────
 
@@ -347,34 +348,44 @@ function TabClientes() {
 function TabConfiguracion() {
   const { data: config, isLoading } = useSiteConfig();
   const updateMutation = useUpdateSiteConfig();
+  const testEmailMutation = useTestSiteConfigEmail();
 
   const [numero, setNumero] = useState("");
   const [mensaje, setMensaje] = useState("");
   const [ppVersion, setPpVersion] = useState("");
   const [ppUrl, setPpUrl] = useState("");
   const [avisoCorto, setAvisoCorto] = useState("");
+  const [emailProvider, setEmailProvider] = useState<"smtp" | "gmail_app">("smtp");
   const [emailHost, setEmailHost] = useState("");
   const [emailPort, setEmailPort] = useState("587");
   const [emailUseTls, setEmailUseTls] = useState(true);
   const [emailUser, setEmailUser] = useState("");
   const [emailPassword, setEmailPassword] = useState("");
   const [emailFrom, setEmailFrom] = useState("");
+  const [gmailSenderEmail, setGmailSenderEmail] = useState("");
+  const [gmailAppPassword, setGmailAppPassword] = useState("");
+  const [testEmail, setTestEmail] = useState("");
+  const [testResult, setTestResult] = useState<{ type: "ok" | "error"; message: string } | null>(null);
   const [saved, setSaved] = useState(false);
 
   const [initialised, setInitialised] = useState(false);
-  if (config && !initialised) {
+  useEffect(() => {
+    if (!config || initialised) return;
     setNumero(config.whatsapp_numero);
     setMensaje(config.whatsapp_mensaje);
     setPpVersion(config.politica_privacidad_version);
     setPpUrl(config.politica_privacidad_url);
     setAvisoCorto(config.aviso_privacidad_corto);
+    setEmailProvider(config.email_provider || "smtp");
     setEmailHost(config.email_host);
     setEmailPort(String(config.email_port));
     setEmailUseTls(config.email_use_tls);
     setEmailUser(config.email_host_user);
     setEmailFrom(config.email_from);
+    setGmailSenderEmail(config.gmail_sender_email || "");
+    setTestEmail((config.email_provider === "gmail_app" ? config.gmail_sender_email : config.email_host_user) || "");
     setInitialised(true);
-  }
+  }, [config, initialised]);
 
   const handleSave = () => {
     const payload: Parameters<typeof updateMutation.mutate>[0] = {
@@ -383,19 +394,53 @@ function TabConfiguracion() {
       politica_privacidad_version: ppVersion,
       politica_privacidad_url: ppUrl,
       aviso_privacidad_corto: avisoCorto,
+      email_provider: emailProvider,
       email_host: emailHost,
       email_port: Number(emailPort) || 587,
       email_use_tls: emailUseTls,
       email_host_user: emailUser,
       email_from: emailFrom,
-      ...(emailPassword ? { email_host_password: emailPassword } : {}),
+      gmail_sender_email: gmailSenderEmail,
+      ...(emailProvider === "smtp" && emailPassword ? { email_host_password: emailPassword } : {}),
+      ...(emailProvider === "gmail_app" && gmailAppPassword ? { gmail_app_password: gmailAppPassword } : {}),
     };
 
     updateMutation.mutate(payload, {
       onSuccess: () => {
         setSaved(true);
         setEmailPassword("");
+        setGmailAppPassword("");
+        const defaultSender = emailProvider === "gmail_app" ? gmailSenderEmail : emailUser;
+        if (!testEmail.trim() && defaultSender.trim()) {
+          setTestEmail(defaultSender.trim());
+        }
         setTimeout(() => setSaved(false), 2500);
+      },
+    });
+  };
+
+  const handleSendTestEmail = () => {
+    const defaultSender = emailProvider === "gmail_app" ? gmailSenderEmail : emailUser;
+    const destination = (testEmail || defaultSender).trim();
+    if (!destination) {
+      setTestResult({
+        type: "error",
+        message: "Ingresa un correo destino para la prueba.",
+      });
+      return;
+    }
+
+    setTestResult(null);
+    testEmailMutation.mutate(destination, {
+      onSuccess: (data) => {
+        setTestResult({ type: "ok", message: data.detail });
+      },
+      onError: (error: unknown) => {
+        const maybeError = error as { response?: { data?: { detail?: string } } };
+        setTestResult({
+          type: "error",
+          message: maybeError.response?.data?.detail || "No se pudo enviar el correo de prueba.",
+        });
       },
     });
   };
@@ -501,10 +546,22 @@ function TabConfiguracion() {
 
       {/* Correo saliente */}
       <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4 sm:p-6 space-y-5">
-        <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">Correo saliente (SMTP)</h2>
+        <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">Correo saliente</h2>
         <p className="text-xs text-gray-500">
-          Configura aquí el servidor SMTP para el envío de correos automáticos (aprobación de participantes, recuperación de contraseña, etc.).
+          Configura SMTP personalizado o Gmail con App Password para pruebas pequeñas.
         </p>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-1">Modo de envío</label>
+          <select
+            value={emailProvider}
+            onChange={(e) => setEmailProvider(e.target.value as "smtp" | "gmail_app")}
+            className={inputCls}
+          >
+            <option value="smtp">SMTP personalizado</option>
+            <option value="gmail_app">Gmail (App Password)</option>
+          </select>
+        </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div className="col-span-2 sm:col-span-1">
@@ -513,6 +570,7 @@ function TabConfiguracion() {
               type="text"
               value={emailHost}
               onChange={(e) => setEmailHost(e.target.value)}
+              disabled={emailProvider === "gmail_app"}
               placeholder="smtp.gmail.com"
               className={inputCls}
             />
@@ -523,6 +581,7 @@ function TabConfiguracion() {
               type="number"
               value={emailPort}
               onChange={(e) => setEmailPort(e.target.value)}
+              disabled={emailProvider === "gmail_app"}
               placeholder="587"
               className={inputCls}
             />
@@ -535,6 +594,7 @@ function TabConfiguracion() {
             type="checkbox"
             checked={emailUseTls}
             onChange={(e) => setEmailUseTls(e.target.checked)}
+            disabled={emailProvider === "gmail_app"}
             className="w-4 h-4 accent-indigo-500"
           />
           <label htmlFor="use-tls" className="text-sm text-gray-300">Usar TLS</label>
@@ -546,6 +606,7 @@ function TabConfiguracion() {
             type="email"
             value={emailUser}
             onChange={(e) => setEmailUser(e.target.value)}
+            disabled={emailProvider === "gmail_app"}
             placeholder="noreply@tudominio.com"
             className={inputCls}
           />
@@ -560,6 +621,7 @@ function TabConfiguracion() {
             type="password"
             value={emailPassword}
             onChange={(e) => setEmailPassword(e.target.value)}
+            disabled={emailProvider === "gmail_app"}
             placeholder="••••••••"
             autoComplete="new-password"
             className={inputCls}
@@ -578,6 +640,66 @@ function TabConfiguracion() {
             placeholder="Folk Eventos <noreply@tudominio.com>"
             className={inputCls}
           />
+        </div>
+
+        {emailProvider === "gmail_app" && (
+          <>
+            <div className="bg-gray-800/60 rounded-lg px-3 py-2 text-xs text-gray-400">
+              Modo de prueba: usa una cuenta de Gmail normal con App Password.
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Correo Gmail</label>
+              <input
+                type="email"
+                value={gmailSenderEmail}
+                onChange={(e) => setGmailSenderEmail(e.target.value)}
+                placeholder="tucorreo@gmail.com"
+                className={inputCls}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">
+                Clave de Google (App Password)
+                <span className="text-gray-500 font-normal ml-1">(déjalo vacío para no cambiarla)</span>
+              </label>
+              <input
+                type="password"
+                value={gmailAppPassword}
+                onChange={(e) => setGmailAppPassword(e.target.value)}
+                placeholder="xxxx xxxx xxxx xxxx"
+                autoComplete="new-password"
+                className={inputCls}
+              />
+            </div>
+          </>
+        )}
+
+        <div className="pt-2 border-t border-gray-800">
+          <label className="block text-sm font-medium text-gray-300 mb-1">
+            Correo para prueba
+          </label>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <input
+              type="email"
+              value={testEmail}
+              onChange={(e) => setTestEmail(e.target.value)}
+              placeholder="tu-correo@dominio.com"
+              className={inputCls}
+            />
+            <button
+              type="button"
+              onClick={handleSendTestEmail}
+              disabled={testEmailMutation.isPending}
+              className="px-4 py-3 sm:py-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg text-sm text-white font-medium disabled:opacity-60 transition"
+            >
+              {testEmailMutation.isPending ? "Enviando..." : "Enviar prueba"}
+            </button>
+          </div>
+          {testResult && (
+            <p className={`text-sm mt-2 ${testResult.type === "ok" ? "text-green-400" : "text-red-400"}`}>
+              {testResult.message}
+            </p>
+          )}
         </div>
       </div>
 

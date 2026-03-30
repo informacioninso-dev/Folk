@@ -473,6 +473,10 @@ class Calificacion(BaseModel):
 # ─── Configuración global del sitio (singleton) ───────────────────────────────
 
 class SiteConfig(models.Model):
+    class EmailProvider(models.TextChoices):
+        SMTP = "smtp", "SMTP personalizado"
+        GMAIL_APP = "gmail_app", "Gmail (App Password)"
+
     """Registro único de configuración global. Siempre usar id=1."""
     whatsapp_numero  = models.CharField(max_length=30, blank=True, default="",
                                         help_text="Número en formato internacional, ej: 593999999999")
@@ -483,6 +487,12 @@ class SiteConfig(models.Model):
     aviso_privacidad_corto = models.TextField(blank=True, default="")
 
     # Configuración de correo saliente
+    email_provider      = models.CharField(
+        max_length=20,
+        choices=EmailProvider.choices,
+        default=EmailProvider.SMTP,
+        help_text="Proveedor de correo: SMTP personalizado o Gmail con App Password.",
+    )
     email_host          = models.CharField(max_length=255, blank=True, default="",
                                            help_text="Ej: smtp.gmail.com")
     email_port          = models.PositiveIntegerField(default=587,
@@ -494,7 +504,17 @@ class SiteConfig(models.Model):
                                            help_text="Contraseña o App Password")
     email_from          = models.EmailField(blank=True, default="",
                                             help_text="Dirección que verá el destinatario (From:)")
-
+    gmail_sender_email  = models.EmailField(
+        blank=True,
+        default="",
+        help_text="Correo de Gmail para pruebas (ej: tucorreo@gmail.com)",
+    )
+    gmail_app_password  = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        help_text="Clave de Google tipo App Password para pruebas.",
+    )
     class Meta:
         verbose_name = "Configuración del sitio"
 
@@ -771,3 +791,4 @@ class OrdenRitmoAgenda(BaseModel):
 
     def __str__(self) -> str:
         return f"#{self.orden} {self.ritmo} {self.modalidad} — {self.evento.nombre}"
+

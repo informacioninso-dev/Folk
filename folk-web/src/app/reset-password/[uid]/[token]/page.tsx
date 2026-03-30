@@ -26,11 +26,11 @@ export default function ResetPasswordPage() {
     e.preventDefault();
     setClientError("");
     if (password !== confirm) {
-      setClientError("Las contraseñas no coinciden.");
+      setClientError("Las contrasenas no coinciden.");
       return;
     }
     if (password.length < 8) {
-      setClientError("La contraseña debe tener al menos 8 caracteres.");
+      setClientError("La contrasena debe tener al menos 8 caracteres.");
       return;
     }
     mutation.mutate({ uid, token, new_password: password });
@@ -41,23 +41,23 @@ export default function ResetPasswordPage() {
       <div className="w-full max-w-sm bg-white rounded-2xl shadow-lg p-8">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-indigo-700 tracking-tight">Folk</h1>
-          <p className="text-sm text-gray-500 mt-1">Nueva contraseña</p>
+          <p className="text-sm text-gray-500 mt-1">Nueva contrasena</p>
         </div>
 
         {mutation.isSuccess ? (
           <div className="space-y-4 text-center">
             <div className="bg-green-50 border border-green-200 text-green-700 rounded-xl px-4 py-4 text-sm">
-              Contraseña restablecida correctamente.
+              Contrasena restablecida correctamente.
             </div>
             <Link href="/login" className="text-sm text-indigo-600 hover:underline block">
-              Ir al inicio de sesión →
+              Ir al inicio de sesion -&gt;
             </Link>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Nueva contraseña
+                Nueva contrasena
               </label>
               <input
                 type="password"
@@ -65,13 +65,13 @@ export default function ResetPasswordPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition"
-                placeholder="Mínimo 8 caracteres"
+                placeholder="Minimo 8 caracteres"
               />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Confirmar contraseña
+                Confirmar contrasena
               </label>
               <input
                 type="password"
@@ -79,7 +79,7 @@ export default function ResetPasswordPage() {
                 value={confirm}
                 onChange={(e) => setConfirm(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition"
-                placeholder="Repite la contraseña"
+                placeholder="Repite la contrasena"
               />
             </div>
 
@@ -94,7 +94,7 @@ export default function ResetPasswordPage() {
               disabled={mutation.isPending}
               className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white font-semibold py-2 rounded-lg transition text-sm"
             >
-              {mutation.isPending ? "Guardando…" : "Establecer contraseña"}
+              {mutation.isPending ? "Guardando..." : "Establecer contrasena"}
             </button>
           </form>
         )}
