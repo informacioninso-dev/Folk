@@ -537,7 +537,7 @@ class ComunicadoView(APIView):
         try:
             folk_send_mail(
                 subject=f"[Folk] {asunto}",
-                message=mensaje,
+                message=f"{mensaje}\n\n---\nFolk · folk.binnso.com",
                 recipient_list=destinatarios,
             )
         except Exception as e:
@@ -1342,7 +1342,7 @@ class ParticipanteGeneralViewSet(viewsets.ModelViewSet):
             frontend_url = getattr(settings, "FRONTEND_URL", "")
             try:
                 folk_send_mail(
-                    subject=f"Acceso al portal Folk — {participante.evento.nombre}",
+                    subject=f"Acceso al portal — {participante.evento.nombre}",
                     message=(
                         f"Hola {participante.nombre_completo},\n\n"
                         f"Tu registro para '{participante.evento.nombre}' ha sido aprobado.\n\n"
@@ -1353,7 +1353,9 @@ class ParticipanteGeneralViewSet(viewsets.ModelViewSet):
                         f"  Usuario: {participante.cedula}\n"
                         f"  Contraseña: {plain_password}\n\n"
                         f"Te recomendamos cambiar tu contraseña después de ingresar.\n"
-                        f"Si tienes problemas, usa la opción '¿Olvidaste tu contraseña?'."
+                        f"Si tienes problemas, usa la opción '¿Olvidaste tu contraseña?'.\n\n"
+                        f"---\n"
+                        f"Gestionado con Folk · folk.binnso.com"
                     ),
                     recipient_list=[participante.correo_electronico],
                 )
@@ -1820,7 +1822,9 @@ class PasswordResetView(MethodScopedThrottleMixin, APIView):
                     "Haz clic en el siguiente enlace para restablecer tu contraseña:\n"
                     f"{reset_url}\n\n"
                     "El enlace expira en 24 horas.\n"
-                    f"Si no solicitaste esto, ignora este mensaje."
+                    "Si no solicitaste esto, ignora este mensaje.\n\n"
+                    "---\n"
+                    "Gestionado con Folk · folk.binnso.com"
                 ),
                 recipient_list=[email],
             )
