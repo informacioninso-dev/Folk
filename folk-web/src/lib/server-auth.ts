@@ -7,7 +7,45 @@ export const REFRESH_COOKIE = "folk_refresh";
 
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
 
+function isPrivateHostname(hostname: string) {
+  const normalized = hostname.toLowerCase();
+  return (
+    ["localhost", "127.0.0.1", "0.0.0.0", "::1"].includes(normalized) ||
+    normalized.endsWith(".local") ||
+    /^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(normalized) ||
+    /^192\.168\.\d{1,3}\.\d{1,3}$/.test(normalized) ||
+    /^172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}$/.test(normalized)
+  );
+}
+
+function getSecureCookieHint(value?: string) {
+  if (!value) return undefined;
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "https:") {
+      return false;
+    }
+    return !isPrivateHostname(url.hostname);
+  } catch {
+    return undefined;
+  }
+}
+
 function isSecureCookie() {
+  const forced = process.env.AUTH_COOKIE_SECURE?.toLowerCase();
+  if (forced === "true" || forced === "1") return true;
+  if (forced === "false" || forced === "0") return false;
+
+  const appHint = getSecureCookieHint(process.env.NEXT_PUBLIC_APP_URL);
+  if (typeof appHint === "boolean") {
+    return appHint;
+  }
+
+  const apiHint = getSecureCookieHint(process.env.NEXT_PUBLIC_API_URL);
+  if (typeof apiHint === "boolean") {
+    return apiHint;
+  }
+
   return process.env.NODE_ENV === "production";
 }
 

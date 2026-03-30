@@ -1,8 +1,7 @@
-import axios from "axios";
+﻿import axios from "axios";
 import { apiClient } from "@/lib/api-client";
+import { publicApiClient } from "@/lib/public-api-client";
 import type { LoginCredentials, LoginResponse, MeResponse } from "./types";
-
-const BASE = process.env.NEXT_PUBLIC_API_URL;
 
 export async function login(credentials: LoginCredentials): Promise<LoginResponse> {
   const { data } = await axios.post<LoginResponse>("/api/auth/login", credentials, {
@@ -17,7 +16,7 @@ export async function getMe(): Promise<MeResponse> {
 }
 
 export async function requestPasswordReset(email: string): Promise<void> {
-  await axios.post(`${BASE}/api/v1/auth/password-reset/`, { email });
+  await publicApiClient.post("/auth/password-reset/", { email });
 }
 
 export async function confirmPasswordReset(
@@ -25,7 +24,7 @@ export async function confirmPasswordReset(
   token: string,
   new_password: string
 ): Promise<void> {
-  await axios.post(`${BASE}/api/v1/auth/password-reset/confirm/`, {
+  await publicApiClient.post("/auth/password-reset/confirm/", {
     uid,
     token,
     new_password,

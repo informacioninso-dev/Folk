@@ -1,10 +1,4 @@
-import axios from "axios";
-
-// Cliente sin auth para endpoints públicos
-const publicClient = axios.create({
-  baseURL: "/api/proxy",
-  headers: { "Content-Type": "application/json" },
-});
+﻿import { publicApiClient } from "@/lib/public-api-client";
 
 export interface EventoHomepage {
   id: number;
@@ -59,7 +53,7 @@ export interface HomepageData {
 }
 
 export async function getHomepageEventos(): Promise<HomepageData> {
-  const { data } = await publicClient.get("/homepage/");
+  const { data } = await publicApiClient.get("/homepage/");
   return data;
 }
 
@@ -69,16 +63,16 @@ export interface SiteConfigPublic {
 }
 
 export async function getSiteConfig(): Promise<SiteConfigPublic> {
-  const { data } = await publicClient.get("/site-config/");
+  const { data } = await publicApiClient.get("/site-config/");
   return data;
 }
 
 export async function getEventoPortal(slug: string): Promise<EventoPortal> {
-  const { data } = await publicClient.get(`/portal/${slug}/`);
+  const { data } = await publicApiClient.get(`/portal/${slug}/`);
   return data;
 }
 
-// ── Full Pass ────────────────────────────────────────────────────────────────
+// â”€â”€ Full Pass â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export interface PagoFullPassEstado {
   estado: "pendiente" | "aprobado" | "rechazado";
@@ -89,7 +83,7 @@ export async function getFullPassEstado(
   slug: string,
   cedula: string
 ): Promise<PagoFullPassEstado | null> {
-  const { data } = await publicClient.get(`/portal/${slug}/full-pass/`, {
+  const { data } = await publicApiClient.get(`/portal/${slug}/full-pass/`, {
     params: { cedula },
   });
   return data;
@@ -99,13 +93,13 @@ export async function submitFullPass(
   slug: string,
   formData: FormData
 ): Promise<{ id: number; estado: string; cedula: string }> {
-  const { data } = await publicClient.post(`/portal/${slug}/full-pass/`, formData, {
+  const { data } = await publicApiClient.post(`/portal/${slug}/full-pass/`, formData, {
     headers: { "Content-Type": "multipart/form-data" },
   });
   return data;
 }
 
-// ── Categorías ───────────────────────────────────────────────────────────────
+// â”€â”€ CategorÃ­as â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export interface InscripcionExistente {
   id: number;
@@ -126,7 +120,7 @@ export async function getCategoriasPortal(
   slug: string,
   cedula: string
 ): Promise<CategoriasPortalResponse> {
-  const { data } = await publicClient.get(`/portal/${slug}/categorias/`, {
+  const { data } = await publicApiClient.get(`/portal/${slug}/categorias/`, {
     params: { cedula },
   });
   return data;
@@ -155,11 +149,11 @@ export async function submitCategoriaPortal(
   slug: string,
   payload: RegistroCategoriaPayload
 ): Promise<{ id: number; estado: string }> {
-  const { data } = await publicClient.post(`/portal/${slug}/categorias/`, payload);
+  const { data } = await publicApiClient.post(`/portal/${slug}/categorias/`, payload);
   return data;
 }
 
-// ── Mi Agenda ────────────────────────────────────────────────────────────────
+// â”€â”€ Mi Agenda â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export interface AgendaItem {
   id: number;
@@ -177,13 +171,13 @@ export async function getMiAgenda(
   slug: string,
   cedula: string
 ): Promise<{ items: AgendaItem[] }> {
-  const { data } = await publicClient.get(`/portal/${slug}/mi-agenda/`, {
+  const { data } = await publicApiClient.get(`/portal/${slug}/mi-agenda/`, {
     params: { cedula },
   });
   return data;
 }
 
-// ── Ranking portal ───────────────────────────────────────────────────────────
+// â”€â”€ Ranking portal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export interface RankingEntry {
   posicion: number;
@@ -202,8 +196,9 @@ export async function getRankingPortal(
   ritmo?: string,
   modalidad?: string
 ): Promise<{ publicado: boolean; categorias: RankingCategoria[] }> {
-  const { data } = await publicClient.get(`/portal/${slug}/ranking/`, {
+  const { data } = await publicApiClient.get(`/portal/${slug}/ranking/`, {
     params: { ritmo, modalidad },
   });
   return data;
 }
+

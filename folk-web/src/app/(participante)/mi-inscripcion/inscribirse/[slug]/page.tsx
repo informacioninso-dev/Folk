@@ -1,13 +1,13 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import axios from "axios";
 import { apiClient } from "@/lib/api-client";
+import { publicApiClient } from "@/lib/public-api-client";
 
-const BASE = process.env.NEXT_PUBLIC_API_URL;
 
-// ─── Tipos ────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Tipos â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface CategoriaPublica {
   id: number;
@@ -30,7 +30,7 @@ interface ParticipanteEncontrado {
   nombre_completo: string;
 }
 
-// ─── Hook: buscar participante por cédula ─────────────────────────────────────
+// â”€â”€â”€ Hook: buscar participante por cÃ©dula â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function useCedulaLookup(slug: string) {
   const cache = useRef<Record<string, ParticipanteEncontrado | null>>({});
@@ -39,8 +39,8 @@ function useCedulaLookup(slug: string) {
     async (cedula: string): Promise<ParticipanteEncontrado | null> => {
       if (cedula.length < 6) return null;
       if (cedula in cache.current) return cache.current[cedula];
-      const { data } = await axios.get<ParticipanteEncontrado | null>(
-        `${BASE}/api/v1/registro-general/${slug}/buscar/`,
+      const { data } = await publicApiClient.get<ParticipanteEncontrado | null>(
+        `/registro-general/${slug}/buscar/`,
         { params: { cedula } }
       );
       cache.current[cedula] = data;
@@ -52,7 +52,7 @@ function useCedulaLookup(slug: string) {
   return buscar;
 }
 
-// ─── Componente: input de cédula con validación ───────────────────────────────
+// â”€â”€â”€ Componente: input de cÃ©dula con validaciÃ³n â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface CedulaInputProps {
   label: string;
@@ -99,7 +99,7 @@ function CedulaInput({ label, slug, value, onChange, onParticipante }: CedulaInp
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder="Cédula / Pasaporte"
+        placeholder="CÃ©dula / Pasaporte"
         className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 transition ${
           estado === "encontrado"
             ? "border-green-400 focus:ring-green-300"
@@ -108,18 +108,18 @@ function CedulaInput({ label, slug, value, onChange, onParticipante }: CedulaInp
             : "border-gray-300 focus:ring-indigo-400"
         }`}
       />
-      {estado === "buscando" && <p className="text-xs text-gray-400 mt-1">Buscando…</p>}
+      {estado === "buscando" && <p className="text-xs text-gray-400 mt-1">Buscandoâ€¦</p>}
       {estado === "encontrado" && (
-        <p className="text-xs text-green-600 mt-1">✓ {nombre}</p>
+        <p className="text-xs text-green-600 mt-1">âœ“ {nombre}</p>
       )}
       {estado === "no_encontrado" && (
-        <p className="text-xs text-red-500 mt-1">No se encontró un participante aprobado con esa cédula.</p>
+        <p className="text-xs text-red-500 mt-1">No se encontrÃ³ un participante aprobado con esa cÃ©dula.</p>
       )}
     </div>
   );
 }
 
-// ─── Componente: upload de archivo ───────────────────────────────────────────
+// â”€â”€â”€ Componente: upload de archivo â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface FileUploadProps {
   label: string;
@@ -151,7 +151,9 @@ function FileUpload({ label, optional, kind, onUrl }: FileUploadProps) {
       const fd = new FormData();
       fd.append("file", file);
       fd.append("kind", kind);
-      const { data } = await axios.post<{ url: string }>(`${BASE}/api/v1/upload/`, fd);
+      const { data } = await publicApiClient.post<{ url: string }>("/upload/", fd, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
       onUrl(data.url);
       setDone(true);
     } catch {
@@ -172,10 +174,10 @@ function FileUpload({ label, optional, kind, onUrl }: FileUploadProps) {
         onClick={() => ref.current?.click()}
       >
         {uploading ? (
-          <p className="text-sm text-indigo-400">Subiendo…</p>
+          <p className="text-sm text-indigo-400">Subiendoâ€¦</p>
         ) : done ? (
           <div>
-            <p className="text-sm text-green-600 font-medium">✓ Subido</p>
+            <p className="text-sm text-green-600 font-medium">âœ“ Subido</p>
             <p className="text-xs text-gray-400 truncate">{fileName}</p>
           </div>
         ) : (
@@ -188,7 +190,7 @@ function FileUpload({ label, optional, kind, onUrl }: FileUploadProps) {
   );
 }
 
-// ─── Página principal ─────────────────────────────────────────────────────────
+// â”€â”€â”€ PÃ¡gina principal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export default function InscribirseModalidadPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -226,8 +228,8 @@ export default function InscribirseModalidadPage() {
   const modalidad = categoria?.modalidad;
 
   useEffect(() => {
-    axios
-      .get<EventoPublico>(`${BASE}/api/v1/registro-general/${slug}/`)
+    publicApiClient
+      .get<EventoPublico>(`/registro-general/${slug}/`)
       .then((r) => setEvento(r.data))
       .catch(() => setNotFound(true))
       .finally(() => setLoadingEvento(false));
@@ -260,7 +262,7 @@ export default function InscribirseModalidadPage() {
     };
 
     if (modalidad === "pareja") {
-      if (!pg1 || !pg2) { setError("Verifica las cédulas de los dos participantes."); setSubmitting(false); return; }
+      if (!pg1 || !pg2) { setError("Verifica las cÃ©dulas de los dos participantes."); setSubmitting(false); return; }
       Object.assign(body, { cedula_1: cedula1, cedula_2: cedula2, representante, cedula_representante: cedulaRep });
     } else if (modalidad === "grupo") {
       const cedulasValidas = cedulas.filter((c) => c.trim());
@@ -277,14 +279,14 @@ export default function InscribirseModalidadPage() {
         const raw = err.response.data as Record<string, string | string[]>;
         setError(Object.values(raw).flat().join(" "));
       } else {
-        setError("Error de conexión. Intenta de nuevo.");
+        setError("Error de conexiÃ³n. Intenta de nuevo.");
       }
     } finally {
       setSubmitting(false);
     }
   };
 
-  // ─── Renders ───────────────────────────────────────────────────────────────
+  // â”€â”€â”€ Renders â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   if (loadingEvento) return <Loading />;
   if (notFound || !evento) return <NotFound />;
@@ -293,10 +295,10 @@ export default function InscribirseModalidadPage() {
     return (
       <div className="flex items-center justify-center py-20">
         <div className="bg-white rounded-2xl border border-gray-200 p-8 text-center max-w-sm space-y-4">
-          <div className="text-5xl">🎉</div>
-          <h2 className="text-xl font-bold text-gray-900">¡Inscripción registrada!</h2>
+          <div className="text-5xl">ðŸŽ‰</div>
+          <h2 className="text-xl font-bold text-gray-900">Â¡InscripciÃ³n registrada!</h2>
           <p className="text-sm text-gray-500">
-            Tu inscripción fue enviada y está pendiente de validación por el organizador.
+            Tu inscripciÃ³n fue enviada y estÃ¡ pendiente de validaciÃ³n por el organizador.
           </p>
           <button
             onClick={() => router.push("/mi-inscripcion")}
@@ -313,26 +315,26 @@ export default function InscribirseModalidadPage() {
     <div className="space-y-6">
       <div>
         <button onClick={() => router.back()} className="text-sm text-indigo-600 hover:underline mb-1">
-          ← Volver
+          â† Volver
         </button>
         <h1 className="text-2xl font-bold text-gray-900">{evento.nombre}</h1>
-        <p className="text-sm text-gray-500">Inscripción en modalidad</p>
+        <p className="text-sm text-gray-500">InscripciÃ³n en modalidad</p>
       </div>
 
       <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-gray-200 p-6 space-y-5">
 
-        {/* Categoría */}
+        {/* CategorÃ­a */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Categoría *</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">CategorÃ­a *</label>
           <select
             value={categoriaId}
             onChange={(e) => setCategoriaId(e.target.value ? Number(e.target.value) : "")}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
           >
-            <option value="">Selecciona una categoría…</option>
+            <option value="">Selecciona una categorÃ­aâ€¦</option>
             {evento.categorias.map((cat) => (
               <option key={cat.id} value={cat.id}>
-                {cat.nombre_ritmo} — {MODALIDAD_LABEL[cat.modalidad]}
+                {cat.nombre_ritmo} â€” {MODALIDAD_LABEL[cat.modalidad]}
               </option>
             ))}
           </select>
@@ -367,27 +369,27 @@ export default function InscribirseModalidadPage() {
           />
         </div>
 
-        {/* ─── Participantes según modalidad ─────────────────────────────── */}
+        {/* â”€â”€â”€ Participantes segÃºn modalidad â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
 
         {modalidad === "solista" && (
           <div className="bg-indigo-50 rounded-xl p-4 text-sm text-indigo-700">
-            Esta modalidad es para un solo participante. Tu cédula registrada será la del acto.
+            Esta modalidad es para un solo participante. Tu cÃ©dula registrada serÃ¡ la del acto.
           </div>
         )}
 
         {modalidad === "pareja" && (
           <div className="space-y-3">
             <p className="text-sm font-medium text-gray-700">Participantes de la pareja</p>
-            <CedulaInput label="Cédula participante 1" slug={slug} value={cedula1} onChange={setCedula1} onParticipante={setPg1} />
-            <CedulaInput label="Cédula participante 2" slug={slug} value={cedula2} onChange={setCedula2} onParticipante={setPg2} />
+            <CedulaInput label="CÃ©dula participante 1" slug={slug} value={cedula1} onChange={setCedula1} onParticipante={setPg1} />
+            <CedulaInput label="CÃ©dula participante 2" slug={slug} value={cedula2} onChange={setCedula2} onParticipante={setPg2} />
             <div className="grid grid-cols-2 gap-3 pt-1">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Representante</label>
                 <input value={representante} onChange={(e) => setRepresentante(e.target.value)} placeholder="Nombre" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Cédula representante</label>
-                <input value={cedulaRep} onChange={(e) => setCedulaRep(e.target.value)} placeholder="Cédula" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                <label className="block text-sm font-medium text-gray-700 mb-1">CÃ©dula representante</label>
+                <input value={cedulaRep} onChange={(e) => setCedulaRep(e.target.value)} placeholder="CÃ©dula" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
               </div>
             </div>
           </div>
@@ -425,7 +427,7 @@ export default function InscribirseModalidadPage() {
                     }}
                     className="mt-6 text-red-400 hover:text-red-600 text-xs"
                   >
-                    ✕
+                    âœ•
                   </button>
                 )}
               </div>
@@ -436,14 +438,14 @@ export default function InscribirseModalidadPage() {
                 <input value={representante} onChange={(e) => setRepresentante(e.target.value)} placeholder="Nombre" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Cédula representante</label>
-                <input value={cedulaRep} onChange={(e) => setCedulaRep(e.target.value)} placeholder="Cédula" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                <label className="block text-sm font-medium text-gray-700 mb-1">CÃ©dula representante</label>
+                <input value={cedulaRep} onChange={(e) => setCedulaRep(e.target.value)} placeholder="CÃ©dula" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
               </div>
             </div>
           </div>
         )}
 
-        {/* ─── Archivos ────────────────────────────────────────────────────── */}
+        {/* â”€â”€â”€ Archivos â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
 
         {modalidad && (
           <div className="space-y-3 pt-1 border-t border-gray-100">
@@ -453,7 +455,7 @@ export default function InscribirseModalidadPage() {
             {categoria && !categoria.incluido_full_pass && (
               <div>
                 <FileUpload
-                  label={`Comprobante de pago de categoría${categoria.precio_adicional && Number(categoria.precio_adicional) > 0 ? ` ($${categoria.precio_adicional})` : ""}`}
+                  label={`Comprobante de pago de categorÃ­a${categoria.precio_adicional && Number(categoria.precio_adicional) > 0 ? ` ($${categoria.precio_adicional})` : ""}`}
                   kind="comprobante"
                   onUrl={setComprobanteUrl}
                 />
@@ -461,7 +463,7 @@ export default function InscribirseModalidadPage() {
             )}
             {categoria && categoria.incluido_full_pass && (
               <div className="bg-green-50 border border-green-100 rounded-xl px-4 py-2.5 text-sm text-green-700">
-                Esta categoría está incluida en el Full Pass — no requiere comprobante adicional.
+                Esta categorÃ­a estÃ¡ incluida en el Full Pass â€” no requiere comprobante adicional.
               </div>
             )}
           </div>
@@ -478,14 +480,14 @@ export default function InscribirseModalidadPage() {
           disabled={submitting || !categoriaId || !nombreActo.trim()}
           className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded-xl transition text-sm"
         >
-          {submitting ? "Enviando…" : "Inscribirme en esta modalidad"}
+          {submitting ? "Enviandoâ€¦" : "Inscribirme en esta modalidad"}
         </button>
       </form>
     </div>
   );
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const MODALIDAD_LABEL: Record<string, string> = {
   solista: "Solista",
@@ -496,7 +498,7 @@ const MODALIDAD_LABEL: Record<string, string> = {
 function Loading() {
   return (
     <div className="flex items-center justify-center py-24 text-gray-400 text-sm">
-      Cargando…
+      Cargandoâ€¦
     </div>
   );
 }
@@ -509,3 +511,4 @@ function NotFound() {
     </div>
   );
 }
+

@@ -1,10 +1,9 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
-import axios from "axios";
+import { publicApiClient } from "@/lib/public-api-client";
 
-const BASE = process.env.NEXT_PUBLIC_API_URL;
 
 const MODALIDAD_LABEL: Record<string, string> = {
   solista: "Solista",
@@ -42,7 +41,7 @@ interface RankingData {
   categorias: CategoriaRanking[];
 }
 
-// ─── Fila de inscripción ──────────────────────────────────────────────────────
+// â”€â”€â”€ Fila de inscripciÃ³n â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function FilaInscripcion({ ins }: { ins: RankingInscripcion }) {
   const [expanded, setExpanded] = useState(false);
@@ -60,7 +59,7 @@ function FilaInscripcion({ ins }: { ins: RankingInscripcion }) {
             ins.posicion === 3 ? "text-amber-600" :
             "text-gray-500"
           }`}>
-            {ins.posicion === 1 ? "🥇" : ins.posicion === 2 ? "🥈" : ins.posicion === 3 ? "🥉" : ins.posicion}
+            {ins.posicion === 1 ? "ðŸ¥‡" : ins.posicion === 2 ? "ðŸ¥ˆ" : ins.posicion === 3 ? "ðŸ¥‰" : ins.posicion}
           </span>
         </td>
         <td className="px-4 py-3">
@@ -72,7 +71,7 @@ function FilaInscripcion({ ins }: { ins: RankingInscripcion }) {
         <td className="px-4 py-3 text-right font-semibold text-indigo-700">
           {parseFloat(ins.puntaje_final).toFixed(2)}
           {ins.desglose.length > 0 && (
-            <span className="ml-1 text-xs text-gray-300">{expanded ? "▲" : "▼"}</span>
+            <span className="ml-1 text-xs text-gray-300">{expanded ? "â–²" : "â–¼"}</span>
           )}
         </td>
       </tr>
@@ -95,7 +94,7 @@ function FilaInscripcion({ ins }: { ins: RankingInscripcion }) {
   );
 }
 
-// ─── Página ───────────────────────────────────────────────────────────────────
+// â”€â”€â”€ PÃ¡gina â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export default function RankingPublicoPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -105,8 +104,8 @@ export default function RankingPublicoPage() {
   const [notPublished, setNotPublished] = useState(false);
 
   useEffect(() => {
-    axios
-      .get<RankingData>(`${BASE}/api/v1/ranking/${slug}/`)
+    publicApiClient
+      .get<RankingData>(`/ranking/${slug}/`)
       .then((r) => setData(r.data))
       .catch((err) => {
         if (err?.response?.status === 403) {
@@ -121,7 +120,7 @@ export default function RankingPublicoPage() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-purple-50">
-        <div className="animate-pulse text-indigo-400 text-sm">Cargando ranking…</div>
+        <div className="animate-pulse text-indigo-400 text-sm">Cargando rankingâ€¦</div>
       </div>
     );
   }
@@ -130,10 +129,10 @@ export default function RankingPublicoPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-purple-50">
         <div className="text-center space-y-2">
-          <div className="text-4xl mb-3">🏆</div>
-          <h1 className="text-2xl font-bold text-gray-700">Resultados aún no disponibles</h1>
+          <div className="text-4xl mb-3">ðŸ†</div>
+          <h1 className="text-2xl font-bold text-gray-700">Resultados aÃºn no disponibles</h1>
           <p className="text-gray-400 text-sm max-w-xs mx-auto">
-            El organizador publicará los resultados cuando la competencia finalice. ¡Vuelve pronto!
+            El organizador publicarÃ¡ los resultados cuando la competencia finalice. Â¡Vuelve pronto!
           </p>
         </div>
       </div>
@@ -166,13 +165,13 @@ export default function RankingPublicoPage() {
         <div className="text-center">
           <p className="text-indigo-600 font-semibold text-sm uppercase tracking-wide mb-1">Folk</p>
           <h1 className="text-3xl font-bold text-gray-900">{data.evento.nombre}</h1>
-          <p className="text-gray-500 text-sm mt-1">{fecha} · {data.evento.ubicacion}</p>
+          <p className="text-gray-500 text-sm mt-1">{fecha} Â· {data.evento.ubicacion}</p>
         </div>
 
         {!hayPuntajes ? (
           <div className="bg-white rounded-2xl shadow-sm p-8 text-center text-gray-400">
-            <p className="text-lg">Las calificaciones aún no están disponibles.</p>
-            <p className="text-sm mt-1">Vuelve más tarde.</p>
+            <p className="text-lg">Las calificaciones aÃºn no estÃ¡n disponibles.</p>
+            <p className="text-sm mt-1">Vuelve mÃ¡s tarde.</p>
           </div>
         ) : (
           data.categorias.map((cat) => (
@@ -213,3 +212,5 @@ export default function RankingPublicoPage() {
     </div>
   );
 }
+
+

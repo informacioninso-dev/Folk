@@ -1,12 +1,11 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
-import axios from "axios";
+import { publicApiClient } from "@/lib/public-api-client";
 
-const BASE = process.env.NEXT_PUBLIC_API_URL;
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface ItemLive {
   id: number;
@@ -29,7 +28,7 @@ interface CronogramaLiveData {
   items: ItemLive[];
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function fmt(seconds: number) {
   const m = Math.floor(seconds / 60);
@@ -40,7 +39,7 @@ function fmt(seconds: number) {
 function itemTitle(item: ItemLive): string {
   if (item.titulo) return item.titulo;
   if (item.nombre_acto) return item.nombre_acto;
-  return `Inscripción #${item.inscripcion}`;
+  return `InscripciÃ³n #${item.inscripcion}`;
 }
 
 function itemDuracion(item: ItemLive): number {
@@ -54,7 +53,7 @@ function formatHora(t: string | null): string {
   return t.slice(0, 5);
 }
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export default function LivePage() {
   const { slug } = useParams<{ slug: string }>();
@@ -68,8 +67,8 @@ export default function LivePage() {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    axios
-      .get<CronogramaLiveData>(`${BASE}/api/v1/cronograma-live/${slug}/`)
+    publicApiClient
+      .get<CronogramaLiveData>(`/cronograma-live/${slug}/`)
       .then((r) => {
         setData(r.data);
         if (r.data.items.length > 0) {
@@ -108,19 +107,19 @@ export default function LivePage() {
     const item = data?.items[currentIdx];
     if (!item) return;
     try {
-      await axios.post(`${BASE}/api/v1/items-cronograma/${item.id}/tiempo-extra/`, { segundos: 30 });
+      await publicApiClient.post(`/items-cronograma/${item.id}/tiempo-extra/`, { segundos: 30 });
     } catch { /* ignore */ }
     setSecondsLeft(prev => prev + 30);
   }, [data, currentIdx]);
 
   useEffect(() => () => stopTimer(), [stopTimer]);
 
-  // ── Estados de carga ────────────────────────────────────────────────────────
+  // â”€â”€ Estados de carga â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-        <p className="animate-pulse text-gray-400">Cargando…</p>
+        <p className="animate-pulse text-gray-400">Cargandoâ€¦</p>
       </div>
     );
   }
@@ -137,12 +136,12 @@ export default function LivePage() {
     return (
       <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center text-center px-4">
         <p className="text-2xl font-bold text-white mb-2">{data.evento.nombre}</p>
-        <p className="text-gray-500 text-sm">La agenda no tiene actividades aún.</p>
+        <p className="text-gray-500 text-sm">La agenda no tiene actividades aÃºn.</p>
       </div>
     );
   }
 
-  // ── Render principal ────────────────────────────────────────────────────────
+  // â”€â”€ Render principal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const total       = data.items.length;
   const currentItem = data.items[currentIdx];
@@ -176,12 +175,12 @@ export default function LivePage() {
           {(currentItem.hora_inicio || currentItem.hora_fin) && (
             <p className="text-indigo-400 text-sm font-mono">
               {formatHora(currentItem.hora_inicio)}
-              {currentItem.hora_inicio && currentItem.hora_fin && " → "}
+              {currentItem.hora_inicio && currentItem.hora_fin && " â†’ "}
               {formatHora(currentItem.hora_fin)}
             </p>
           )}
 
-          {/* Título */}
+          {/* TÃ­tulo */}
           <h1 className="text-3xl font-bold text-white leading-tight">
             {itemTitle(currentItem)}
           </h1>
@@ -191,12 +190,12 @@ export default function LivePage() {
             <p className="text-indigo-300 text-sm">{currentItem.responsable}</p>
           )}
 
-          {/* Descripción */}
+          {/* DescripciÃ³n */}
           {currentItem.descripcion && (
             <p className="text-gray-400 text-sm">{currentItem.descripcion}</p>
           )}
 
-          {/* Barra + Timer (solo si hay duración) */}
+          {/* Barra + Timer (solo si hay duraciÃ³n) */}
           {hasDur && (
             <>
               <div className="w-full bg-gray-800 rounded-full h-2">
@@ -213,7 +212,7 @@ export default function LivePage() {
                 {fmt(secondsLeft)}
               </p>
               {secondsLeft === 0 && (
-                <p className="text-red-400 text-sm font-medium animate-pulse">¡Tiempo!</p>
+                <p className="text-red-400 text-sm font-medium animate-pulse">Â¡Tiempo!</p>
               )}
             </>
           )}
@@ -226,7 +225,7 @@ export default function LivePage() {
             disabled={currentIdx === 0}
             className="px-4 py-2 bg-gray-800 hover:bg-gray-700 disabled:opacity-30 text-white text-sm rounded-xl transition"
           >
-            ← Anterior
+            â† Anterior
           </button>
 
           {hasDur && (
@@ -237,14 +236,14 @@ export default function LivePage() {
                   disabled={secondsLeft === 0}
                   className="px-6 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-40 text-white text-sm font-semibold rounded-xl transition"
                 >
-                  ▶ Iniciar
+                  â–¶ Iniciar
                 </button>
               ) : (
                 <button
                   onClick={stopTimer}
                   className="px-6 py-2 bg-yellow-600 hover:bg-yellow-700 text-white text-sm font-semibold rounded-xl transition"
                 >
-                  ⏸ Pausar
+                  â¸ Pausar
                 </button>
               )}
               <button
@@ -261,7 +260,7 @@ export default function LivePage() {
             disabled={isLast}
             className="px-4 py-2 bg-gray-800 hover:bg-gray-700 disabled:opacity-30 text-white text-sm rounded-xl transition"
           >
-            Siguiente →
+            Siguiente â†’
           </button>
         </div>
 
@@ -300,3 +299,5 @@ export default function LivePage() {
     </div>
   );
 }
+
+

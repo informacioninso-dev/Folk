@@ -1,9 +1,10 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import axios from "axios";
+import { publicApiClient } from "@/lib/public-api-client";
 import {
   getCategoriasPortal,
   getEventoPortal,
@@ -17,16 +18,15 @@ import PrivacyConsent, {
   validatePrivacyConsent,
 } from "@/features/portal/components/PrivacyConsent";
 
-const BASE = process.env.NEXT_PUBLIC_API_URL;
 
-// ─── Tipos ────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Tipos â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface FpInfo {
   nombre_completo?: string;
   estado: string;
 }
 
-// ─── Hook: verificar Full Pass de una cédula ──────────────────────────────────
+// â”€â”€â”€ Hook: verificar Full Pass de una cÃ©dula â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function useFpLookup(slug: string) {
   const cache = useRef<Record<string, FpInfo | null>>({});
@@ -37,8 +37,8 @@ function useFpLookup(slug: string) {
       if (key.length < 6) return null;
       if (key in cache.current) return cache.current[key];
       try {
-        const { data } = await axios.get<FpInfo | null>(
-          `${BASE}/api/v1/portal/${slug}/full-pass/`,
+        const { data } = await publicApiClient.get<FpInfo | null>(
+          `/portal/${slug}/full-pass/`,
           { params: { cedula: key } }
         );
         const result = data && data.estado === "aprobado" ? data : null;
@@ -52,7 +52,7 @@ function useFpLookup(slug: string) {
   );
 }
 
-// ─── Componente: input de cédula con verificación de FP ──────────────────────
+// â”€â”€â”€ Componente: input de cÃ©dula con verificaciÃ³n de FP â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface CedulaVerificadaProps {
   label: string;
@@ -111,16 +111,16 @@ function CedulaVerificada({
           value={value}
           onChange={(e) => !locked && onChange(e.target.value)}
           readOnly={locked || disabled}
-          placeholder={locked ? "" : "Cédula / Pasaporte"}
+          placeholder={locked ? "" : "CÃ©dula / Pasaporte"}
           className={`w-full px-3 py-2.5 bg-gray-800 border rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 transition ${borderClass} ${locked ? "opacity-60 cursor-not-allowed" : ""}`}
         />
         {locked && (
-          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500">tú</span>
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500">tÃº</span>
         )}
       </div>
-      {estado === "buscando" && <p className="text-xs text-gray-400 mt-1">Verificando Full Pass…</p>}
+      {estado === "buscando" && <p className="text-xs text-gray-400 mt-1">Verificando Full Passâ€¦</p>}
       {estado === "ok" && nombre && (
-        <p className="text-xs text-green-400 mt-1">✓ {nombre} — Full Pass aprobado</p>
+        <p className="text-xs text-green-400 mt-1">âœ“ {nombre} â€” Full Pass aprobado</p>
       )}
       {estado === "no_fp" && (
         <p className="text-xs text-red-400 mt-1">
@@ -131,7 +131,7 @@ function CedulaVerificada({
   );
 }
 
-// ─── Componente: upload de archivo ───────────────────────────────────────────
+// â”€â”€â”€ Componente: upload de archivo â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function FileUpload({
   label, optional, kind, onUrl,
@@ -161,7 +161,9 @@ function FileUpload({
       const fd = new FormData();
       fd.append("file", file);
       fd.append("kind", kind);
-      const { data } = await axios.post<{ url: string }>(`${BASE}/api/v1/upload/`, fd);
+      const { data } = await publicApiClient.post<{ url: string }>("/upload/", fd, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
       onUrl(data.url); setDone(true);
     } catch {
       setErr("No se pudo subir el archivo."); setFileName("");
@@ -180,10 +182,10 @@ function FileUpload({
         onClick={() => ref.current?.click()}
       >
         {uploading ? (
-          <p className="text-sm text-indigo-400">Subiendo…</p>
+          <p className="text-sm text-indigo-400">Subiendoâ€¦</p>
         ) : done ? (
           <div>
-            <p className="text-sm text-green-400 font-medium">✓ Subido</p>
+            <p className="text-sm text-green-400 font-medium">âœ“ Subido</p>
             <p className="text-xs text-gray-500 truncate mt-0.5">{fileName}</p>
           </div>
         ) : (
@@ -196,7 +198,7 @@ function FileUpload({
   );
 }
 
-// ─── Constantes ───────────────────────────────────────────────────────────────
+// â”€â”€â”€ Constantes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const MODALIDAD_LABELS: Record<string, string> = {
   solista: "Solista", pareja: "Pareja", grupo: "Grupo",
@@ -204,11 +206,11 @@ const MODALIDAD_LABELS: Record<string, string> = {
 
 const ESTADO_CONFIG: Record<string, { label: string; cls: string }> = {
   aprobada:  { label: "Aprobada",         cls: "bg-green-900/40 text-green-400 border-green-500/30" },
-  pendiente: { label: "Pend. validación", cls: "bg-yellow-900/40 text-yellow-400 border-yellow-500/30" },
+  pendiente: { label: "Pend. validaciÃ³n", cls: "bg-yellow-900/40 text-yellow-400 border-yellow-500/30" },
   rechazada: { label: "Rechazada",        cls: "bg-red-900/40 text-red-400 border-red-500/30" },
 };
 
-// ─── Página principal ─────────────────────────────────────────────────────────
+// â”€â”€â”€ PÃ¡gina principal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export default function InscribirseCategoriPage() {
   const { slug, id } = useParams<{ slug: string; id: string }>();
@@ -233,7 +235,7 @@ export default function InscribirseCategoriPage() {
   const [cedula2,          setCedula2]           = useState("");
   const [fp2Ok,            setFp2Ok]             = useState(false);
 
-  // Grupo: miembros adicionales (miembro 1 = tú, ya locked)
+  // Grupo: miembros adicionales (miembro 1 = tÃº, ya locked)
   const [miembros,         setMiembros]          = useState<string[]>(["", ""]);  // 2 inputs = 3 total con el tuyo
   const [miembrosOk,       setMiembrosOk]        = useState<boolean[]>([false, false]);
 
@@ -242,13 +244,13 @@ export default function InscribirseCategoriPage() {
   const [pistaUrl,         setPistaUrl]          = useState("");
   const [comprobanteUrl,   setComprobanteUrl]    = useState("");
 
-  // Estado del envío
+  // Estado del envÃ­o
   const [submitting,       setSubmitting]        = useState(false);
   const [error,            setError]             = useState("");
   const [success,          setSuccess]           = useState(false);
   const [privacy,          setPrivacy]           = useState(createPrivacyConsentState);
 
-  // ── Carga inicial ──────────────────────────────────────────────────────────
+  // â”€â”€ Carga inicial â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   useEffect(() => {
     getEventoPortal(slug).then(setEvento).catch(() => null);
@@ -278,7 +280,7 @@ export default function InscribirseCategoriPage() {
       .finally(() => setLoading(false));
   }, [slug, cedula, categoriaId]);
 
-  // ── Helpers grupo ──────────────────────────────────────────────────────────
+  // â”€â”€ Helpers grupo â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const updateMiembro = useCallback((idx: number, val: string) => {
     setMiembros((p) => p.map((v, i) => (i === idx ? val : v)));
@@ -299,7 +301,7 @@ export default function InscribirseCategoriPage() {
     setMiembrosOk((p) => p.filter((_, i) => i !== idx));
   };
 
-  // ── Submit ─────────────────────────────────────────────────────────────────
+  // â”€â”€ Submit â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -308,7 +310,7 @@ export default function InscribirseCategoriPage() {
     const modalidad = categoria.modalidad;
 
     if (modalidad === "pareja" && !fp2Ok) {
-      setError("Verifica la cédula del segundo participante — debe tener Full Pass aprobado.");
+      setError("Verifica la cÃ©dula del segundo participante â€” debe tener Full Pass aprobado.");
       return;
     }
     if (modalidad === "grupo") {
@@ -319,7 +321,7 @@ export default function InscribirseCategoriPage() {
       }
     }
     if (!categoria.incluido_full_pass && !comprobanteUrl) {
-      setError("Debes adjuntar el comprobante de pago de esta categoría.");
+      setError("Debes adjuntar el comprobante de pago de esta categorÃ­a.");
       return;
     }
 
@@ -359,19 +361,19 @@ export default function InscribirseCategoriPage() {
         const raw = err.response.data as Record<string, string | string[]>;
         setError(Object.values(raw).flat().join(" "));
       } else {
-        setError("Error de conexión. Intenta de nuevo.");
+        setError("Error de conexiÃ³n. Intenta de nuevo.");
       }
     } finally {
       setSubmitting(false);
     }
   };
 
-  // ── Renders ────────────────────────────────────────────────────────────────
+  // â”€â”€ Renders â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center text-gray-400 text-sm">
-        Cargando…
+        Cargandoâ€¦
       </div>
     );
   }
@@ -381,20 +383,20 @@ export default function InscribirseCategoriPage() {
       <div className="min-h-screen bg-gray-950 text-white flex flex-col items-center justify-center gap-4 px-4">
         <p className="text-gray-400 text-center">
           {!cedula || cedula.length < 6
-            ? "Debes consultar desde la página de categorías con tu cédula."
-            : "Esta categoría no está disponible o no tienes acceso."}
+            ? "Debes consultar desde la pÃ¡gina de categorÃ­as con tu cÃ©dula."
+            : "Esta categorÃ­a no estÃ¡ disponible o no tienes acceso."}
         </p>
         <Link
           href={`/evento/${slug}/categorias${cedula ? `?cedula=${cedula}` : ""}`}
           className="text-indigo-400 hover:underline text-sm"
         >
-          ← Volver a categorías
+          â† Volver a categorÃ­as
         </Link>
       </div>
     );
   }
 
-  // Ya inscrito en esta categoría — mostrar estado
+  // Ya inscrito en esta categorÃ­a â€” mostrar estado
   if (yaInscrito) {
     const est = ESTADO_CONFIG[yaInscrito.estado];
     return (
@@ -405,15 +407,15 @@ export default function InscribirseCategoriPage() {
               href={`/evento/${slug}/categorias?cedula=${cedula}`}
               className="text-gray-400 hover:text-white text-sm transition"
             >
-              ← Volver a categorías
+              â† Volver a categorÃ­as
             </Link>
           </div>
         </nav>
         <div className="max-w-2xl mx-auto px-4 pt-24 pb-16 flex flex-col items-center gap-6">
           <div className="bg-gray-900 border border-white/10 rounded-2xl p-8 text-center max-w-sm space-y-4 w-full">
-            <p className="text-4xl">✅</p>
-            <h2 className="text-lg font-bold">{categoria.nombre_ritmo} — {MODALIDAD_LABELS[categoria.modalidad]}</h2>
-            <p className="text-sm text-gray-400">Ya estás inscrito en esta categoría.</p>
+            <p className="text-4xl">âœ…</p>
+            <h2 className="text-lg font-bold">{categoria.nombre_ritmo} â€” {MODALIDAD_LABELS[categoria.modalidad]}</h2>
+            <p className="text-sm text-gray-400">Ya estÃ¡s inscrito en esta categorÃ­a.</p>
             <div className="bg-gray-800 rounded-xl px-4 py-3 space-y-1 text-sm">
               <p className="text-white font-semibold">{yaInscrito.nombre_acto}</p>
               <span className={`inline-block text-xs font-semibold px-2.5 py-1 rounded-full border ${est?.cls ?? ""}`}>
@@ -432,17 +434,17 @@ export default function InscribirseCategoriPage() {
     );
   }
 
-  // Pantalla de éxito
+  // Pantalla de Ã©xito
   if (success) {
     return (
       <div className="min-h-screen bg-gray-950 text-white flex items-center justify-center px-4">
         <div className="bg-gray-900 border border-white/10 rounded-2xl p-8 text-center max-w-sm space-y-4">
-          <p className="text-5xl">ðŸŽ‰</p>
-          <h2 className="text-xl font-bold">¡Inscripción registrada!</h2>
+          <p className="text-5xl">Ã°Å¸Å½â€°</p>
+          <h2 className="text-xl font-bold">Â¡InscripciÃ³n registrada!</h2>
           <p className="text-sm text-gray-400">
             {categoria.incluido_full_pass
-              ? "Tu inscripción fue aprobada automáticamente — está incluida en tu Full Pass."
-              : "Tu inscripción fue enviada y está pendiente de validación por el organizador."}
+              ? "Tu inscripciÃ³n fue aprobada automÃ¡ticamente â€” estÃ¡ incluida en tu Full Pass."
+              : "Tu inscripciÃ³n fue enviada y estÃ¡ pendiente de validaciÃ³n por el organizador."}
           </p>
           <Link
             href={`/evento/${slug}/categorias?cedula=${cedula}`}
@@ -455,18 +457,18 @@ export default function InscribirseCategoriPage() {
     );
   }
 
-  // ── Formulario principal ───────────────────────────────────────────────────
+  // â”€â”€ Formulario principal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const modalidad    = categoria.modalidad;
   const precioParsed = parseFloat(categoria.precio_adicional);
   const nombrePlaceholder =
     modalidad === "solista"
-      ? "Tu nombre artístico (opcional)"
+      ? "Tu nombre artÃ­stico (opcional)"
       : modalidad === "pareja"
       ? "Ej: Los Reyes del Ritmo (opcional)"
       : "Ej: Academia Salsa Brava (opcional)";
 
-  const totalMiembros = 1 + miembros.length; // tú + miembros adicionales
+  const totalMiembros = 1 + miembros.length; // tÃº + miembros adicionales
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
@@ -477,7 +479,7 @@ export default function InscribirseCategoriPage() {
             href={`/evento/${slug}/categorias?cedula=${cedula}`}
             className="text-gray-400 hover:text-white text-sm transition"
           >
-            ← Volver a categorías
+            â† Volver a categorÃ­as
           </Link>
         </div>
       </nav>
@@ -505,14 +507,14 @@ export default function InscribirseCategoriPage() {
             {modalidad === "solista"
               ? "Modalidad individual"
               : modalidad === "pareja"
-              ? "Participa en pareja — el compañero debe tener Full Pass aprobado"
-              : `Participa en grupo — mínimo 3 miembros, todos con Full Pass aprobado (${totalMiembros} actualmente)`}
+              ? "Participa en pareja â€” el compaÃ±ero debe tener Full Pass aprobado"
+              : `Participa en grupo â€” mÃ­nimo 3 miembros, todos con Full Pass aprobado (${totalMiembros} actualmente)`}
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
 
-          {/* ── Nombre del acto ───────────────────────────────────────────── */}
+          {/* â”€â”€ Nombre del acto â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
           <div className="bg-gray-900 border border-white/10 rounded-2xl p-5 space-y-4">
             <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">
               {modalidad === "solista" ? "Tu acto" : modalidad === "pareja" ? "Tu pareja" : "Tu grupo"}
@@ -522,7 +524,7 @@ export default function InscribirseCategoriPage() {
               <label className="block text-sm font-medium text-gray-300 mb-1.5">
                 Nombre{" "}
                 <span className="text-gray-500 font-normal">
-                  (si no lo pones, se asigna uno automáticamente)
+                  (si no lo pones, se asigna uno automÃ¡ticamente)
                 </span>
               </label>
               <input
@@ -653,17 +655,18 @@ export default function InscribirseCategoriPage() {
             </div>
           )}
 
-          {/* ── Submit ────────────────────────────────────────────────────── */}
+          {/* â”€â”€ Submit â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
           <button
             type="submit"
             disabled={submitting}
             className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-semibold py-3 rounded-xl transition text-sm"
           >
-            {submitting ? "Enviando…" : "Inscribirme en esta categoría"}
+            {submitting ? "Enviandoâ€¦" : "Inscribirme en esta categorÃ­a"}
           </button>
         </form>
       </div>
     </div>
   );
 }
+
 

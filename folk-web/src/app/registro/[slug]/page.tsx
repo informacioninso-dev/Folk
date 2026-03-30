@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
@@ -6,14 +6,14 @@ import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import axios from "axios";
+import { publicApiClient } from "@/lib/public-api-client";
 import PrivacyConsent, {
   createPrivacyConsentState,
   validatePrivacyConsent,
 } from "@/features/portal/components/PrivacyConsent";
 
-const BASE = process.env.NEXT_PUBLIC_API_URL;
 
-// ─── Tipos ────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Tipos â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface EventoPublico {
   id: number;
@@ -33,19 +33,19 @@ interface RegistroResult {
   estado: string;
 }
 
-// ─── Schema ───────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Schema â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const schema = z.object({
   nombre_completo:    z.string().min(2, "Nombre requerido"),
-  cedula:             z.string().min(4, "Cédula requerida"),
-  edad:               z.coerce.number().int().min(1, "Edad inválida").max(120, "Edad inválida"),
-  correo_electronico: z.string().email("Correo inválido"),
-  telefono:           z.string().min(7, "Teléfono requerido"),
+  cedula:             z.string().min(4, "CÃ©dula requerida"),
+  edad:               z.coerce.number().int().min(1, "Edad invÃ¡lida").max(120, "Edad invÃ¡lida"),
+  correo_electronico: z.string().email("Correo invÃ¡lido"),
+  telefono:           z.string().min(7, "TelÃ©fono requerido"),
 });
 
 type FormValues = z.infer<typeof schema>;
 
-// ─── Componente ───────────────────────────────────────────────────────────────
+// â”€â”€â”€ Componente â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export default function RegistroPublicoPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -74,8 +74,8 @@ export default function RegistroPublicoPage() {
   const requiresRepresentative = (typeof edad === "number" && edad < 18) || privacy.es_menor_edad;
 
   useEffect(() => {
-    axios
-      .get<EventoPublico>(`${BASE}/api/v1/registro-general/${slug}/`)
+    publicApiClient
+      .get<EventoPublico>(`/registro-general/${slug}/`)
       .then((r) => setEvento(r.data))
       .catch(() => setNotFound(true))
       .finally(() => setLoadingEvento(false));
@@ -91,7 +91,9 @@ export default function RegistroPublicoPage() {
       const fd = new FormData();
       fd.append("file", file);
       fd.append("kind", "comprobante");
-      const { data } = await axios.post<{ url: string }>(`${BASE}/api/v1/upload/`, fd);
+      const { data } = await publicApiClient.post<{ url: string }>("/upload/", fd, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
       setUploadedUrl(data.url);
     } catch {
       setUploadError("No se pudo subir el archivo. Intenta de nuevo.");
@@ -109,8 +111,7 @@ export default function RegistroPublicoPage() {
       return;
     }
     try {
-      const { data } = await axios.post<RegistroResult>(
-        `${BASE}/api/v1/registro-general/${slug}/`,
+      const { data } = await axios.post<RegistroResult>(`/api/proxy/registro-general/${slug}/`,
         { ...values, comprobante_pago_url: uploadedUrl, ...privacy }
       );
       setResult(data);
@@ -120,17 +121,17 @@ export default function RegistroPublicoPage() {
         const msg = Object.values(raw).flat().join(" ");
         setServerError(msg || "Error al procesar el registro.");
       } else {
-        setServerError("Error de conexión. Intenta de nuevo.");
+        setServerError("Error de conexiÃ³n. Intenta de nuevo.");
       }
     }
   };
 
-  // ─── Estados de carga/error/éxito ────────────────────────────────────────
+  // â”€â”€â”€ Estados de carga/error/Ã©xito â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   if (loadingEvento) {
     return (
       <Screen>
-        <div className="animate-pulse text-indigo-400 text-sm">Cargando evento…</div>
+        <div className="animate-pulse text-indigo-400 text-sm">Cargando eventoâ€¦</div>
       </Screen>
     );
   }
@@ -141,7 +142,7 @@ export default function RegistroPublicoPage() {
         <div className="text-center">
           <h1 className="text-2xl font-bold text-gray-700 mb-2">Evento no encontrado</h1>
           <p className="text-gray-400 text-sm">
-            El enlace puede haber expirado o el evento no está activo.
+            El enlace puede haber expirado o el evento no estÃ¡ activo.
           </p>
         </div>
       </Screen>
@@ -152,22 +153,22 @@ export default function RegistroPublicoPage() {
     return (
       <Screen>
         <div className="bg-white rounded-2xl shadow-lg p-8 text-center max-w-sm w-full space-y-4">
-          <div className="text-5xl">📋</div>
-          <h2 className="text-2xl font-bold text-gray-900">¡Registro enviado!</h2>
+          <div className="text-5xl">ðŸ“‹</div>
+          <h2 className="text-2xl font-bold text-gray-900">Â¡Registro enviado!</h2>
           <p className="text-gray-500 text-sm">
-            Tu comprobante de pago está siendo revisado. Recibirás un correo cuando sea aprobado.
+            Tu comprobante de pago estÃ¡ siendo revisado. RecibirÃ¡s un correo cuando sea aprobado.
           </p>
           <div className="bg-indigo-50 rounded-xl px-6 py-4">
             <p className="text-xs text-indigo-500 uppercase tracking-wide font-medium mb-1">
-              Número de referencia
+              NÃºmero de referencia
             </p>
             <p className="text-3xl font-bold text-indigo-700">#{result.id}</p>
             <p className="text-xs text-gray-400 mt-1">
-              Guarda este número para consultas.
+              Guarda este nÃºmero para consultas.
             </p>
           </div>
           <p className="text-xs text-gray-400">
-            Se ha enviado una copia a tu correo electrónico.
+            Se ha enviado una copia a tu correo electrÃ³nico.
           </p>
         </div>
       </Screen>
@@ -186,7 +187,7 @@ export default function RegistroPublicoPage() {
         <div className="text-center">
           <p className="text-indigo-600 font-semibold text-sm uppercase tracking-wide mb-1">Folk</p>
           <h1 className="text-3xl font-bold text-gray-900">{evento.nombre}</h1>
-          <p className="text-gray-500 text-sm mt-1">{fecha} · {evento.ubicacion}</p>
+          <p className="text-gray-500 text-sm mt-1">{fecha} Â· {evento.ubicacion}</p>
         </div>
 
         {/* Formulario */}
@@ -197,14 +198,14 @@ export default function RegistroPublicoPage() {
           <Field label="Nombre completo" error={errors.nombre_completo?.message}>
             <input
               {...register("nombre_completo")}
-              placeholder="Ej: María García"
+              placeholder="Ej: MarÃ­a GarcÃ­a"
               className={input()}
             />
           </Field>
 
-          {/* Cédula + Edad */}
+          {/* CÃ©dula + Edad */}
           <div className="flex gap-3">
-            <Field label="Cédula / Pasaporte" error={errors.cedula?.message} className="flex-1">
+            <Field label="CÃ©dula / Pasaporte" error={errors.cedula?.message} className="flex-1">
               <input {...register("cedula")} placeholder="0912345678" className={input()} />
             </Field>
             <Field label="Edad" error={errors.edad?.message} className="w-24">
@@ -213,7 +214,7 @@ export default function RegistroPublicoPage() {
           </div>
 
           {/* Correo */}
-          <Field label="Correo electrónico" error={errors.correo_electronico?.message}>
+          <Field label="Correo electrÃ³nico" error={errors.correo_electronico?.message}>
             <input
               {...register("correo_electronico")}
               type="email"
@@ -222,8 +223,8 @@ export default function RegistroPublicoPage() {
             />
           </Field>
 
-          {/* Teléfono */}
-          <Field label="Teléfono / WhatsApp" error={errors.telefono?.message}>
+          {/* TelÃ©fono */}
+          <Field label="TelÃ©fono / WhatsApp" error={errors.telefono?.message}>
             <input
               {...register("telefono")}
               type="tel"
@@ -243,10 +244,10 @@ export default function RegistroPublicoPage() {
               onClick={() => fileRef.current?.click()}
             >
               {uploading ? (
-                <p className="text-sm text-indigo-400">Subiendo…</p>
+                <p className="text-sm text-indigo-400">Subiendoâ€¦</p>
               ) : uploadedUrl ? (
                 <div className="space-y-1">
-                  <p className="text-sm text-green-600 font-medium">✓ Archivo subido</p>
+                  <p className="text-sm text-green-600 font-medium">âœ“ Archivo subido</p>
                   <p className="text-xs text-gray-400 truncate">{fileName}</p>
                 </div>
               ) : (
@@ -287,7 +288,7 @@ export default function RegistroPublicoPage() {
             disabled={isSubmitting || uploading}
             className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white font-semibold py-2.5 rounded-xl transition text-sm"
           >
-            {isSubmitting ? "Enviando…" : "Registrarme"}
+            {isSubmitting ? "Enviandoâ€¦" : "Registrarme"}
           </button>
         </form>
 
@@ -299,7 +300,7 @@ export default function RegistroPublicoPage() {
   );
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function Screen({ children }: { children: React.ReactNode }) {
   return (
@@ -332,3 +333,5 @@ function Field({
 function input() {
   return "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 transition";
 }
+
+
