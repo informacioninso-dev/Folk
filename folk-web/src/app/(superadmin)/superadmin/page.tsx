@@ -970,7 +970,7 @@ function TabPanel() {
         <StatCard label="Clientes" value={stats?.total_clientes ?? 0} />
         <StatCard label="Eventos totales" value={stats?.total_eventos ?? 0} />
         <StatCard label="Portales activos" value={stats?.portales_activos ?? 0} />
-        <StatCard label="Inscripciones" value={stats?.total_inscripciones ?? 0} />
+        <StatCard label="Participantes" value={stats?.total_participantes ?? 0} />
         <StatCard label="Full Pass aprobados" value={stats?.full_pass_aprobados ?? 0} />
         <StatCard
           label="Total cobrado"

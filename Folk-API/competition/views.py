@@ -672,7 +672,7 @@ class SuperadminDashboardView(APIView):
         # Estadísticas globales
         total_eventos = Evento.objects.count()
         total_portales_activos = Evento.objects.filter(portal_activo=True).count()
-        total_inscripciones = Inscripcion.objects.count()
+        total_participantes = ParticipanteGeneral.objects.count() + PagoFullPass.objects.count()
         total_full_pass_aprobados = PagoFullPass.objects.filter(estado="aprobado").count()
         total_clientes = Organizador.objects.count()
         total_cobrado = (
@@ -686,7 +686,7 @@ class SuperadminDashboardView(APIView):
             "estadisticas": {
                 "total_eventos": total_eventos,
                 "portales_activos": total_portales_activos,
-                "total_inscripciones": total_inscripciones,
+                "total_participantes": total_participantes,
                 "full_pass_aprobados": total_full_pass_aprobados,
                 "total_clientes": total_clientes,
                 "total_cobrado": str(total_cobrado),

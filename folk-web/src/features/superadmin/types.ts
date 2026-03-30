@@ -33,7 +33,7 @@ export interface DashboardEvento {
 export interface DashboardStats {
   total_eventos: number;
   portales_activos: number;
-  total_inscripciones: number;
+  total_participantes: number;
   full_pass_aprobados: number;
   total_clientes: number;
   total_cobrado: string;
