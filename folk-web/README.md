@@ -1,36 +1,109 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Folk Web — Frontend
 
-## Getting Started
+Frontend del sistema **Folk** para la gestión de eventos de danza y competencias. Construido con Next.js 14 (App Router), React Query, Tailwind CSS y TypeScript.
 
-First, run the development server:
+## Stack
+
+- **Next.js 14** (App Router, output standalone)
+- **React 18** + TypeScript
+- **TanStack React Query 5** — fetching y cache de datos
+- **React Hook Form + Zod** — formularios y validación
+- **Axios** — cliente HTTP con proxy hacia el backend
+- **Tailwind CSS 3** — estilos
+
+## Módulos del sistema
+
+| Ruta | Descripción |
+|------|-------------|
+| `/login` | Autenticación JWT |
+| `/eventos` | Lista y creación de eventos (organizado) |
+| `/eventos/[id]` | Gestión de un evento: categorías, participantes, jueces, agenda, criterios, ranking, pagos, portal |
+| `/inscripciones` | Vista de inscripciones del organizador |
+| `/calificaciones` | Panel de calificación por categoría |
+| `/ranking` | Rankings por evento y categoría |
+| `/evento/[slug]` | Portal público del evento (inscripción, Full Pass, agenda, ranking) |
+| `/registro/[slug]` | Registro público de participantes |
+| `/calificar/[eventoId]` | Interfaz de juez para calificar |
+| `/superadmin` | Panel de administración global (solo staff) |
+| `/superadmin/organizadores/[id]` | Detalle de cliente: plan, eventos, historial, pagos FP |
+
+## Estructura
+
+```
+src/
+  app/              # Rutas Next.js (App Router)
+    (auth)/         # Login, recuperar contraseña
+    (dashboard)/    # Panel del organizador
+    (participante)/ # Vista del participante
+    (juez)/         # Interfaz del juez
+    (superadmin)/   # Panel superadmin
+    api/proxy/      # Proxy hacia la API backend
+    evento/[slug]/  # Portal público
+  features/         # Lógica por dominio (hooks, api, types)
+  lib/              # Cliente axios, utilidades de auth
+```
+
+## Setup local
+
+### Requisitos
+
+- Node.js 20+
+- Backend Folk-API corriendo en `http://localhost:8000`
+
+### Instalación
+
+```bash
+npm install
+```
+
+### Variables de entorno
+
+Crea un archivo `.env.local` en la raíz de `folk-web/`:
+
+```env
+NEXT_PUBLIC_API_URL=http://localhost:8000
+```
+
+### Desarrollo
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Abre [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Build de producción
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run build
+npm start
+```
 
-## Learn More
+O con Docker (ver instrucciones en [DEPLOY.md](../DEPLOY.md)):
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+# Desde la raíz del monorepo
+export NEXT_PUBLIC_API_URL=https://api.tudominio.com
+docker compose -f docker-compose.prod.yml up --build -d
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Variables de entorno — Producción
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+| Variable | Descripción |
+|----------|-------------|
+| `NEXT_PUBLIC_API_URL` | URL pública del backend (ej. `https://api.tudominio.com`) |
 
-## Deploy on Vercel
+Ver `.env.production.example` para la plantilla completa.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Proxy API
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Todas las llamadas del frontend pasan por `/api/proxy/[...path]` (Next.js Route Handler), que reenvía las peticiones al backend. Esto evita problemas de CORS en el cliente y permite manejar cookies HttpOnly de forma segura.
+
+## Usuarios del sistema
+
+| Rol | Acceso |
+|-----|--------|
+| Organizador | Dashboard completo: eventos, inscripciones, calificaciones, ranking |
+| Participante | Ver y gestionar su inscripción |
+| Juez | Calificar categorías asignadas |
+| Superadmin | Panel global: clientes, eventos, pagos Full Pass, comunicados |
