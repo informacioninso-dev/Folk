@@ -8,6 +8,9 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "Folk – Gestión de Concursos de Baile",
   description: "SaaS multi-tenant para gestión y calificación de concursos de baile",
+  icons: {
+    icon: "/logo.png",
+  },
 };
 
 export default function RootLayout({

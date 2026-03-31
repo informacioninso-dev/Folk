@@ -124,15 +124,9 @@ export default function HomePageClient({
     <div className="min-h-screen bg-white font-sans text-gray-900">
       <nav className="fixed left-0 right-0 top-0 z-50 border-b border-gray-100 bg-white/95 shadow-sm backdrop-blur-sm">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
-          <Link href="/" className="flex shrink-0 items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-orange-500 to-red-600 shadow-md">
-              <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
-              </svg>
-            </div>
-            <span className="select-none bg-gradient-to-r from-orange-600 to-red-600 bg-clip-text text-xl font-extrabold tracking-tight text-transparent">
-              Folk
-            </span>
+          <Link href="/" className="flex shrink-0 items-center">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo.png" alt="Folk" className="h-10 w-auto" />
           </Link>
 
           <div className="flex items-center gap-2">
@@ -149,7 +143,7 @@ export default function HomePageClient({
             </a>
             <Link
               href="/login"
-              className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-red-600 px-4 py-2 text-sm font-bold text-white shadow-sm shadow-orange-200 transition hover:from-orange-600 hover:to-red-700"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-orange-500 px-4 py-2 text-sm font-bold text-white transition hover:bg-orange-600"
             >
               Ingresar
             </Link>
@@ -164,7 +158,7 @@ export default function HomePageClient({
               {current.banner_url ? (
                 <img src={current.banner_url} alt={current.nombre} className="absolute inset-0 h-full w-full object-cover object-center" />
               ) : (
-                <div className="absolute inset-0 bg-gradient-to-br from-red-700 via-orange-600 to-yellow-500" />
+                <div className="absolute inset-0 bg-gradient-to-br from-orange-500 via-teal-500 to-teal-400" />
               )}
               <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/30 to-transparent" />
 
@@ -184,7 +178,7 @@ export default function HomePageClient({
                 </p>
                 <Link
                   href={`/evento/${current.slug}`}
-                  className="inline-flex w-fit items-center gap-2 rounded-xl bg-gradient-to-r from-orange-500 to-red-500 px-5 py-2.5 text-sm font-bold text-white shadow-lg transition hover:from-orange-600 hover:to-red-600"
+                  className="inline-flex w-fit items-center gap-2 rounded-xl bg-orange-500 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-orange-600"
                 >
                   Ver evento
                   <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -229,7 +223,7 @@ export default function HomePageClient({
             <div className="mx-auto max-w-7xl px-6 py-24 text-center">
               <h1 className="mb-4 text-5xl font-extrabold tracking-tight text-gray-900">
                 La plataforma de{" "}
-                <span className="bg-gradient-to-r from-orange-500 to-red-600 bg-clip-text text-transparent">
+                <span className="text-orange-500">
                   concursos de baile.
                 </span>
               </h1>
@@ -272,7 +266,7 @@ export default function HomePageClient({
           </select>
 
           {hayFiltros && (
-            <button onClick={limpiar} className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-gray-400 transition hover:text-red-500">
+            <button onClick={limpiar} className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-gray-400 transition hover:text-teal-500">
               <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
               </svg>
@@ -387,17 +381,17 @@ export default function HomePageClient({
 
       <section id="contacto" className="py-16">
         <div className="mx-auto max-w-4xl px-6">
-          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-red-600 via-orange-500 to-yellow-400 p-10 text-center shadow-2xl shadow-orange-200 md:p-16">
-            <div className="absolute -right-10 -top-10 h-56 w-56 rounded-full bg-white/10" />
-            <div className="absolute -bottom-12 -left-8 h-40 w-40 rounded-full bg-white/10" />
+          <div className="relative overflow-hidden rounded-3xl bg-gray-900 p-10 text-center md:p-16">
+            <div className="absolute -right-10 -top-10 h-56 w-56 rounded-full bg-orange-500/10" />
+            <div className="absolute -bottom-12 -left-8 h-40 w-40 rounded-full bg-teal-500/10" />
 
-            <p className="relative mb-3 text-xs font-bold uppercase tracking-widest text-white/80">
+            <p className="relative mb-3 text-xs font-bold uppercase tracking-widest text-orange-400">
               Tienes un evento?
             </p>
             <h2 className="relative mb-4 text-3xl font-extrabold leading-tight text-white md:text-4xl">
               Hablemos por WhatsApp.
             </h2>
-            <p className="relative mx-auto mb-10 max-w-lg text-base text-white/80">
+            <p className="relative mx-auto mb-10 max-w-lg text-base text-gray-400">
               Cuentanos sobre tu competencia y te asesoramos sin compromiso. Respuesta inmediata.
             </p>
 
@@ -418,13 +412,9 @@ export default function HomePageClient({
 
       <footer className="bg-gray-900 text-white">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 px-6 py-10 md:flex-row">
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-orange-500 to-red-600">
-              <svg className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
-              </svg>
-            </div>
-            <span className="text-lg font-extrabold">Folk</span>
+          <div className="flex items-center gap-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo.png" alt="Folk" className="h-8 w-auto" />
             <span className="text-sm text-gray-500">Plataforma de concursos de baile</span>
           </div>
           <p className="text-xs text-gray-500">© {new Date().getFullYear()} Folk. Todos los derechos reservados.</p>
@@ -446,7 +436,7 @@ function EventoCard({ ev }: { ev: EventoHomepage }) {
               className="absolute inset-0 h-full w-full object-cover object-center transition-transform duration-500 group-hover:scale-105"
             />
           ) : (
-            <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-orange-400 to-red-500">
+            <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-orange-400 to-teal-500">
               <svg className="h-12 w-12 text-white/50" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
               </svg>
@@ -454,7 +444,7 @@ function EventoCard({ ev }: { ev: EventoHomepage }) {
           )}
           <div className="absolute left-3 top-3 flex gap-1.5">
             {ev.destacado && (
-              <span className="rounded-full bg-gradient-to-r from-orange-500 to-red-500 px-2.5 py-1 text-xs font-bold text-white shadow">
+              <span className="rounded-full bg-gradient-to-r from-orange-500 to-teal-500 px-2.5 py-1 text-xs font-bold text-white shadow">
                 Destacado
               </span>
             )}
