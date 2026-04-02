@@ -53,8 +53,8 @@ function MesPicker({
                 onClick={() => onChange(active ? "" : key)}
                 className={`rounded-full px-2.5 py-1 text-xs font-semibold transition-all ${
                   active
-                    ? "bg-orange-500 text-white shadow-sm"
-                    : "bg-gray-100 text-gray-500 hover:bg-orange-100 hover:text-orange-600"
+                    ? "bg-indigo-600 text-white shadow-lg shadow-indigo-900/10"
+                    : "bg-gray-100 text-gray-500 hover:bg-indigo-50 hover:text-indigo-700"
                 }`}
               >
                 {MESES[parseInt(m, 10) - 1]}
@@ -121,8 +121,8 @@ export default function HomePageClient({
   };
 
   return (
-    <div className="min-h-screen bg-white font-sans text-gray-900">
-      <nav className="fixed left-0 right-0 top-0 z-50 border-b border-gray-100 bg-white/95 shadow-sm backdrop-blur-sm">
+    <div className="min-h-screen bg-transparent font-sans text-gray-900">
+      <nav className="fixed left-0 right-0 top-0 z-50 border-b border-indigo-100 bg-white/85 shadow-sm backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
           <Link href="/" className="flex shrink-0 items-center">
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -134,16 +134,16 @@ export default function HomePageClient({
               href={`https://wa.me/${siteConfig.whatsapp_numero}?text=${encodeURIComponent(siteConfig.whatsapp_mensaje)}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="hidden items-center gap-1.5 rounded-xl bg-green-50 px-4 py-2 text-sm font-semibold text-green-700 transition hover:bg-green-100 sm:inline-flex"
+              className="hidden items-center gap-1.5 rounded-xl bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100 sm:inline-flex"
             >
-              <svg className="h-4 w-4 text-green-500" viewBox="0 0 24 24" fill="currentColor">
+              <svg className="h-4 w-4 text-emerald-500" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
               </svg>
               WhatsApp
             </a>
             <Link
               href="/login"
-              className="inline-flex items-center gap-1.5 rounded-xl bg-orange-500 px-4 py-2 text-sm font-bold text-white transition hover:bg-orange-600"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-gray-900 px-4 py-2 text-sm font-bold text-white transition hover:bg-indigo-700"
             >
               Ingresar
             </Link>
@@ -154,17 +154,17 @@ export default function HomePageClient({
       <div className="pt-16">
         {destacados.length > 0 && current ? (
           <div className="mx-auto max-w-7xl px-6 py-8">
-            <div className="relative overflow-hidden rounded-3xl shadow-2xl shadow-orange-100" style={{ aspectRatio: "21/9" }}>
+            <div className="relative overflow-hidden rounded-3xl shadow-2xl shadow-indigo-900/10" style={{ aspectRatio: "21/9" }}>
               {current.banner_url ? (
                 <img src={current.banner_url} alt={current.nombre} className="absolute inset-0 h-full w-full object-cover object-center" />
               ) : (
-                <div className="absolute inset-0 bg-gradient-to-br from-orange-500 via-teal-500 to-teal-400" />
+                <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-indigo-700 to-emerald-500" />
               )}
               <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/30 to-transparent" />
 
               <div className="relative flex h-full max-w-xl flex-col justify-center px-10 py-8">
-                <span className="mb-3 inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-orange-300">
-                  <span className="h-px w-3 bg-orange-400" />
+                <span className="mb-3 inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-orange-200">
+                  <span className="h-px w-3 bg-orange-300" />
                   Destacado
                 </span>
                 <h2 className="mb-2 text-2xl font-extrabold leading-tight text-white drop-shadow md:text-4xl">
@@ -178,7 +178,7 @@ export default function HomePageClient({
                 </p>
                 <Link
                   href={`/evento/${current.slug}`}
-                  className="inline-flex w-fit items-center gap-2 rounded-xl bg-orange-500 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-orange-600"
+                  className="inline-flex w-fit items-center gap-2 rounded-xl bg-orange-500 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-gray-900"
                 >
                   Ver evento
                   <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -210,7 +210,7 @@ export default function HomePageClient({
                       <button
                         key={i}
                         onClick={() => setSliderIdx(i)}
-                        className={`rounded-full transition-all ${i === sliderIdx ? "h-1.5 w-5 bg-orange-400" : "h-1.5 w-1.5 bg-white/40 hover:bg-white/70"}`}
+                        className={`rounded-full transition-all ${i === sliderIdx ? "h-1.5 w-5 bg-orange-300" : "h-1.5 w-1.5 bg-white/40 hover:bg-white/70"}`}
                       />
                     ))}
                   </div>
@@ -219,11 +219,15 @@ export default function HomePageClient({
             </div>
           </div>
         ) : (
-          <div className="bg-gradient-to-br from-orange-50 via-amber-50 to-yellow-50">
+          <div className="bg-gradient-to-br from-indigo-50 via-white to-emerald-50">
             <div className="mx-auto max-w-7xl px-6 py-24 text-center">
+              <div className="mb-8 flex justify-center">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/logo.png" alt="Folk" className="h-20 w-auto" />
+              </div>
               <h1 className="mb-4 text-5xl font-extrabold tracking-tight text-gray-900">
                 La plataforma de{" "}
-                <span className="text-orange-500">
+                <span className="text-indigo-700">
                   concursos de baile.
                 </span>
               </h1>
@@ -242,7 +246,7 @@ export default function HomePageClient({
 
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <div className="relative min-w-[180px] flex-1">
-            <svg className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <svg className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
             </svg>
             <input
@@ -250,14 +254,14 @@ export default function HomePageClient({
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Buscar evento..."
-              className="w-full rounded-lg border border-gray-200 bg-white py-1.5 pl-8 pr-3 text-xs text-gray-900 placeholder-gray-400 transition focus:border-orange-300 focus:outline-none focus:ring-1 focus:ring-orange-400"
+              className="w-full rounded-lg border border-gray-200 bg-white py-1.5 pl-8 pr-3 text-xs text-gray-900 placeholder-gray-400 transition focus:border-indigo-300 focus:outline-none focus:ring-1 focus:ring-indigo-400"
             />
           </div>
 
           <select
             value={estadoFiltro}
             onChange={(e) => setEstado(e.target.value)}
-            className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs text-gray-700 transition focus:border-orange-300 focus:outline-none focus:ring-1 focus:ring-orange-400"
+            className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs text-gray-700 transition focus:border-indigo-300 focus:outline-none focus:ring-1 focus:ring-indigo-400"
           >
             <option value="">Todos</option>
             <option value="activa">Activo</option>
@@ -266,7 +270,7 @@ export default function HomePageClient({
           </select>
 
           {hayFiltros && (
-            <button onClick={limpiar} className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-gray-400 transition hover:text-teal-500">
+            <button onClick={limpiar} className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-gray-400 transition hover:text-emerald-600">
               <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
               </svg>
@@ -280,14 +284,14 @@ export default function HomePageClient({
         )}
 
         {filtrados.length === 0 ? (
-          <div className="rounded-2xl border-2 border-dashed border-orange-100 py-20 text-center">
+          <div className="rounded-2xl border-2 border-dashed border-indigo-100 py-20 text-center">
             {hayFiltros ? (
               <>
-                <svg className="mx-auto mb-3 h-10 w-10 text-orange-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <svg className="mx-auto mb-3 h-10 w-10 text-indigo-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
                 </svg>
                 <p className="text-sm font-medium text-gray-500">Sin resultados para esa busqueda</p>
-                <button onClick={limpiar} className="mt-3 text-sm text-orange-600 hover:underline">
+                <button onClick={limpiar} className="mt-3 text-sm text-indigo-700 hover:underline">
                   Ver todos los eventos.
                 </button>
               </>
@@ -311,10 +315,10 @@ export default function HomePageClient({
         )}
       </section>
 
-      <section className="border-y border-orange-100 bg-gradient-to-br from-orange-50 via-amber-50 to-yellow-50 py-20">
+      <section className="border-y border-indigo-100 bg-gradient-to-br from-indigo-50 via-white to-emerald-50 py-20">
         <div className="mx-auto max-w-7xl px-6">
           <div className="mb-12 text-center">
-            <p className="mb-2 text-xs font-bold uppercase tracking-widest text-orange-600">Organizas eventos?</p>
+            <p className="mb-2 text-xs font-bold uppercase tracking-widest text-indigo-700">Organizas eventos?</p>
             <h2 className="mb-3 text-3xl font-extrabold tracking-tight text-gray-900 md:text-4xl">
               Contrata nuestra plataforma.
             </h2>
@@ -353,8 +357,8 @@ export default function HomePageClient({
                 desc: "Portal publico con resultados, agenda y cronograma. Tus participantes consultan su posicion en vivo.",
               },
             ].map((s) => (
-              <div key={s.title} className="rounded-2xl border border-orange-100 bg-white p-7 transition-shadow hover:shadow-lg hover:shadow-orange-50">
-                <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-orange-100 to-amber-100 text-orange-600">
+              <div key={s.title} className="rounded-2xl border border-indigo-100 bg-white p-7 transition-all hover:-translate-y-0.5 hover:shadow-lg hover:shadow-indigo-900/10">
+                <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-100 to-emerald-100 text-indigo-700">
                   {s.icon}
                 </div>
                 <h3 className="mb-2 text-base font-bold text-gray-900">{s.title}</h3>
@@ -368,7 +372,7 @@ export default function HomePageClient({
               href={`https://wa.me/${siteConfig.whatsapp_numero}?text=${encodeURIComponent(siteConfig.whatsapp_mensaje)}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2.5 rounded-xl bg-green-500 px-8 py-3.5 text-sm font-bold text-white shadow-lg shadow-green-200 transition hover:bg-green-600"
+              className="inline-flex items-center gap-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-emerald-700 px-8 py-3.5 text-sm font-bold text-white shadow-lg shadow-indigo-900/10 transition hover:from-gray-900 hover:to-indigo-700"
             >
               <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
@@ -382,10 +386,10 @@ export default function HomePageClient({
       <section id="contacto" className="py-16">
         <div className="mx-auto max-w-4xl px-6">
           <div className="relative overflow-hidden rounded-3xl bg-gray-900 p-10 text-center md:p-16">
-            <div className="absolute -right-10 -top-10 h-56 w-56 rounded-full bg-orange-500/10" />
-            <div className="absolute -bottom-12 -left-8 h-40 w-40 rounded-full bg-teal-500/10" />
+            <div className="absolute -right-10 -top-10 h-56 w-56 rounded-full bg-indigo-500/20" />
+            <div className="absolute -bottom-12 -left-8 h-40 w-40 rounded-full bg-emerald-400/20" />
 
-            <p className="relative mb-3 text-xs font-bold uppercase tracking-widest text-orange-400">
+            <p className="relative mb-3 text-xs font-bold uppercase tracking-widest text-orange-300">
               Tienes un evento?
             </p>
             <h2 className="relative mb-4 text-3xl font-extrabold leading-tight text-white md:text-4xl">
@@ -399,9 +403,9 @@ export default function HomePageClient({
               href={`https://wa.me/${siteConfig.whatsapp_numero}?text=${encodeURIComponent(siteConfig.whatsapp_mensaje)}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="relative inline-flex items-center gap-3 rounded-2xl bg-white px-8 py-4 text-lg font-extrabold text-green-700 shadow-xl transition-all duration-200 hover:scale-105 hover:bg-green-50 hover:shadow-2xl"
+              className="relative inline-flex items-center gap-3 rounded-2xl bg-white px-8 py-4 text-lg font-extrabold text-emerald-700 shadow-xl transition-all duration-200 hover:scale-105 hover:bg-emerald-50 hover:shadow-2xl"
             >
-              <svg className="h-7 w-7 text-green-500" viewBox="0 0 24 24" fill="currentColor">
+              <svg className="h-7 w-7 text-emerald-700" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
               </svg>
               Escribenos ahora.
@@ -427,7 +431,7 @@ export default function HomePageClient({
 function EventoCard({ ev }: { ev: EventoHomepage }) {
   return (
     <Link href={`/evento/${ev.slug}`} className="group block">
-      <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white transition-all duration-300 hover:border-orange-200 hover:shadow-xl hover:shadow-orange-50">
+      <div className="overflow-hidden rounded-2xl border border-indigo-100 bg-white transition-all duration-300 hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-lg hover:shadow-indigo-900/10">
         <div className="relative h-44 overflow-hidden">
           {ev.banner_url ? (
             <img
@@ -436,7 +440,7 @@ function EventoCard({ ev }: { ev: EventoHomepage }) {
               className="absolute inset-0 h-full w-full object-cover object-center transition-transform duration-500 group-hover:scale-105"
             />
           ) : (
-            <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-orange-400 to-teal-500">
+            <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-gray-900 via-indigo-700 to-emerald-500">
               <svg className="h-12 w-12 text-white/50" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
               </svg>
@@ -444,7 +448,7 @@ function EventoCard({ ev }: { ev: EventoHomepage }) {
           )}
           <div className="absolute left-3 top-3 flex gap-1.5">
             {ev.destacado && (
-              <span className="rounded-full bg-gradient-to-r from-orange-500 to-teal-500 px-2.5 py-1 text-xs font-bold text-white shadow">
+              <span className="rounded-full bg-gradient-to-r from-indigo-600 to-emerald-700 px-2.5 py-1 text-xs font-bold text-white shadow">
                 Destacado
               </span>
             )}
@@ -454,7 +458,7 @@ function EventoCard({ ev }: { ev: EventoHomepage }) {
           </div>
         </div>
         <div className="p-5">
-          <h3 className="mb-1 text-base font-bold leading-snug text-gray-900 transition group-hover:text-orange-600">
+          <h3 className="mb-1 text-base font-bold leading-snug text-gray-900 transition group-hover:text-indigo-700">
             {ev.nombre}
           </h3>
           <p className="mb-3 text-xs font-medium text-gray-500">{ev.organizador_nombre}</p>

@@ -29,22 +29,22 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex bg-white">
+    <div className="min-h-screen flex bg-gray-50">
       {/* Panel izquierdo — decorativo */}
-      <div className="hidden lg:flex flex-1 relative overflow-hidden bg-white items-center justify-center p-12">
+      <div className="hidden lg:flex flex-1 relative overflow-hidden bg-gradient-to-br from-white via-indigo-50/70 to-emerald-50 items-center justify-center p-12">
         {/* Manchas decorativas */}
-        <div className="absolute -top-20 -left-20 w-72 h-72 bg-orange-400/50 rounded-full blur-3xl" />
-        <div className="absolute -bottom-20 -right-20 w-72 h-72 bg-teal-400/50 rounded-full blur-3xl" />
-        <div className="absolute top-1/3 right-10 w-40 h-40 bg-yellow-300/50 rounded-full blur-2xl" />
+        <div className="absolute -top-20 -left-20 h-72 w-72 rounded-full bg-indigo-400/30 blur-3xl" />
+        <div className="absolute -bottom-20 -right-20 h-72 w-72 rounded-full bg-emerald-400/35 blur-3xl" />
+        <div className="absolute top-1/3 right-10 h-40 w-40 rounded-full bg-orange-300/40 blur-2xl" />
 
         <div className="relative text-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo.png" alt="Folk" className="h-28 w-auto mx-auto mb-8" />
-          <p className="text-gray-600 text-lg font-medium mb-10">Plataforma de concursos de baile</p>
+          <p className="mb-10 text-lg font-medium text-gray-600">Plataforma de concursos de baile</p>
           <div className="space-y-4 text-left max-w-xs mx-auto">
             {["Inscripciones online", "Calificaciones en tiempo real", "Ranking automático"].map((item) => (
               <div key={item} className="flex items-center gap-3 text-gray-700 text-sm font-medium">
-                <div className="w-6 h-6 bg-gradient-to-br from-orange-400 to-red-500 rounded-full flex items-center justify-center shrink-0 shadow-sm">
+                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-orange-400 to-indigo-500 shadow-sm">
                   <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
                   </svg>
@@ -82,7 +82,7 @@ export default function LoginPage() {
                 type="text"
                 autoComplete="username"
                 placeholder="Tu usuario"
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent transition bg-gray-50 hover:bg-white"
+                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 placeholder-gray-400 transition hover:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent"
               />
               {errors.username && (
                 <p className="text-xs text-red-500 mt-1.5">{errors.username.message}</p>
@@ -95,7 +95,7 @@ export default function LoginPage() {
                 <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide">
                   Contraseña
                 </label>
-                <Link href="/forgot-password" className="text-xs text-orange-500 hover:text-orange-700 font-medium transition">
+                <Link href="/forgot-password" className="text-xs font-medium text-indigo-600 transition hover:text-indigo-800">
                   ¿La olvidaste?
                 </Link>
               </div>
@@ -105,12 +105,12 @@ export default function LoginPage() {
                   type={showPassword ? "text" : "password"}
                   autoComplete="current-password"
                   placeholder="••••••••"
-                  className="w-full px-4 py-3 pr-11 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent transition bg-gray-50 hover:bg-white"
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 pr-11 text-sm text-gray-900 placeholder-gray-400 transition hover:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-orange-500 transition"
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 transition hover:text-indigo-600"
                   tabIndex={-1}
                 >
                   {showPassword ? (
@@ -143,7 +143,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loginMutation.isPending}
-              className="w-full bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 disabled:opacity-60 text-white font-bold py-3 rounded-xl transition shadow-md shadow-orange-200 text-sm tracking-wide"
+              className="w-full rounded-xl bg-gradient-to-r from-orange-500 via-orange-500 to-indigo-600 py-3 text-sm font-bold tracking-wide text-white shadow-lg shadow-indigo-900/10 transition hover:from-orange-600 hover:to-indigo-700 disabled:opacity-60"
             >
               {loginMutation.isPending ? "Ingresando…" : "Ingresar"}
             </button>
@@ -151,7 +151,7 @@ export default function LoginPage() {
 
           <p className="text-center text-xs text-gray-400 mt-8">
             ¿Eres participante?{" "}
-            <Link href="/" className="text-orange-500 hover:text-orange-700 font-medium transition">
+            <Link href="/" className="font-medium text-indigo-600 transition hover:text-indigo-800">
               Ver eventos
             </Link>
           </p>
